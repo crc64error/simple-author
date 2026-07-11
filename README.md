@@ -5,7 +5,7 @@ Kindle-ready EPUB. Everything works offline: spellcheck, thesaurus, fonts,
 and your manuscript never leave your machine.
 
 **[Try it in your browser](https://crc64error.github.io/simple-author/)** ·
-**[Download for Mac, Windows, or Linux](https://github.com/crc64error/simple-author/releases)**
+**[Download for Mac, Windows, or Linux, coming soon]()**
 
 ## Features
 
