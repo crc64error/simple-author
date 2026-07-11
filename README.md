@@ -30,6 +30,12 @@ and your manuscript never leave your machine.
 
 ## Install
 
+> [!WARNING]
+> Only the **macOS** build has been tested so far. The **Windows and Linux**
+> builds are produced by the same CI pipeline but are **untested** — reports
+> (good or bad) are very welcome in the
+> [issues](https://github.com/crc64error/simple-author/issues).
+
 Grab the installer for your platform from the
 [latest release](https://github.com/crc64error/simple-author/releases/latest):
 
