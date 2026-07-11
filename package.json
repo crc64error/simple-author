@@ -1,0 +1,39 @@
+{
+  "name": "simple-author",
+  "version": "1.0.0",
+  "description": "A distraction-free book writing editor for long-form fiction",
+  "license": "GPL-3.0-only",
+  "author": "Carey Scott Turner",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/crc64error/simple-author.git"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:build:appstore": "tauri build --config src-tauri/tauri.appstore.conf.json"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.5.0",
+    "@tauri-apps/plugin-dialog": "^2.2.2",
+    "@tauri-apps/plugin-fs": "^2.2.2",
+    "@codemirror/commands": "^6.8.0",
+    "@codemirror/language": "^6.11.0",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.36.4",
+    "codemirror": "^6.0.1",
+    "jszip": "^3.10.1",
+    "nspell": "^2.1.5"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.5.0",
+    "@types/nspell": "^2.1.6",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.2"
+  }
+}

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple Author</title>
+    <link rel="stylesheet" href="/fonts/fonts.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <h1 class="app-title">Simple Author</h1>
+          <span class="app-subtitle">Distraction-free book writing</span>
+        </div>
+        <div class="toolbar-center">
+          <button type="button" id="btn-outline" class="tool-btn secondary" title="Toggle chapter outline" aria-pressed="true">
+            <span class="tool-icon">☰</span> Outline
+          </button>
+          <div class="view-toggle" role="group" aria-label="Editor view mode" title="Work in raw markdown or with the markdown rendered (⌘P)">
+            <button type="button" id="btn-view-markdown" class="view-toggle-btn" aria-pressed="true">Markdown</button>
+            <button type="button" id="btn-view-rendered" class="view-toggle-btn" aria-pressed="false">Rendered</button>
+          </div>
+          <button type="button" id="btn-section" class="tool-btn" title="Section / Part (# )">
+            <span class="tool-icon">¶</span> Section
+          </button>
+          <button type="button" id="btn-chapter" class="tool-btn" title="Chapter title (## )">
+            <span class="tool-icon">§</span> Chapter
+          </button>
+          <button type="button" id="btn-italic" class="tool-btn" title="Italic (*text*)">
+            <span class="tool-icon"><em>I</em></span> Italic
+          </button>
+          <button type="button" id="btn-notes" class="tool-btn" title="Author note ([Notes]…[/Notes])">
+            <span class="tool-icon">✎</span> Notes
+          </button>
+          <button type="button" id="btn-toggle-notes" class="tool-btn secondary" title="Show or hide author notes" aria-pressed="true">
+            Show Notes
+          </button>
+          <button type="button" id="btn-toggle-marks" class="tool-btn secondary" title="Show paragraph ¶ and line break ↵ markers" aria-pressed="false">
+            Show Marks
+          </button>
+          <select id="template-select" class="theme-select" title="Insert Kindle (KDP) front and back matter pages">
+            <option value="">Insert…</option>
+          </select>
+        </div>
+        <div class="toolbar-right">
+          <select id="theme-select" class="theme-select" title="Interface theme">
+            <option value="forest">Forest</option>
+            <option value="midnight">Midnight</option>
+            <option value="parchment">Parchment</option>
+            <option value="slate">Slate</option>
+          </select>
+          <select id="export-select" class="theme-select" title="Export without notes">
+            <option value="">Export…</option>
+            <option value="md">Markdown (no notes)</option>
+            <option value="txt">Plain text (no notes)</option>
+            <option value="epub">EPUB for Kindle (no notes)</option>
+          </select>
+          <button type="button" id="btn-publish-guide" class="tool-btn secondary" title="Kindle / KDP publishing guide">
+            Publish Guide
+          </button>
+          <button type="button" id="btn-new" class="tool-btn secondary" title="Start a new file">New</button>
+          <button type="button" id="btn-open" class="tool-btn secondary">Open</button>
+          <button type="button" id="btn-save" class="tool-btn secondary" title="Save with notes included (Shift+Save = Save As)">Save</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside id="outline-sidebar" class="outline-sidebar">
+          <div class="outline-header">
+            <h2 class="outline-title">Outline</h2>
+          </div>
+          <div class="outline-body">
+            <p class="outline-empty">No sections yet. Add a section with <code># Section 1 — Title</code>, then chapters with <code>## Chapter One</code>.</p>
+            <ul class="outline-list" hidden></ul>
+          </div>
+        </aside>
+        <div id="editor-container" class="editor-container">
+          <div id="reminders-panel" class="reminders-panel">
+            <div class="reminders-header">
+              <span class="reminders-label">Writing Reminders</span>
+              <span class="reminders-hint">not included in export</span>
+              <button type="button" id="btn-toggle-reminders" class="reminders-toggle" aria-expanded="true" title="Hide writing reminders">−</button>
+            </div>
+            <div class="reminders-body">
+              <textarea
+                id="reminders-input"
+                class="reminders-input"
+                rows="2"
+                spellcheck="true"
+                placeholder="Short notes to keep in view while you write…"
+              ></textarea>
+            </div>
+          </div>
+          <div id="editor" class="editor-main"></div>
+        </div>
+      </main>
+
+      <footer class="status-bar">
+        <div class="status-group">
+          <span class="status-label">Section</span>
+          <span id="section-words" class="status-value">0</span>
+          <span class="status-unit">words</span>
+        </div>
+        <div class="status-divider"></div>
+        <div class="status-group">
+          <span class="status-label">Chapter</span>
+          <span id="chapter-words" class="status-value">0</span>
+          <span class="status-unit">words</span>
+        </div>
+        <div class="status-divider"></div>
+        <div class="status-group">
+          <span class="status-label">Book</span>
+          <span id="book-words" class="status-value">0</span>
+          <span class="status-unit">words</span>
+        </div>
+        <div class="status-spacer"></div>
+        <div class="status-group status-hint">
+          <span id="cursor-context"></span>
+        </div>
+      </footer>
+    </div>
+    <input type="file" id="file-input" accept=".md,.txt,.sw" hidden />
+
+    <div id="publish-modal" class="modal-backdrop" hidden>
+      <div class="modal-panel" role="dialog" aria-labelledby="publish-modal-title" aria-modal="true">
+        <header class="modal-header">
+          <h2 id="publish-modal-title">Publishing Guide</h2>
+          <button type="button" id="publish-modal-close" class="modal-close" aria-label="Close">×</button>
+        </header>
+        <div id="publish-modal-body" class="modal-body"></div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
