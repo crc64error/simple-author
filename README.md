@@ -31,7 +31,7 @@ and your manuscript never leave your machine.
 ## Install
 
 Grab the installer for your platform from the
-[latest release](https://github.com/crc64error/simple-author/releases):
+Coming Soon:
 
 - **macOS** — `.dmg` (universal). The app is not notarized; the first time,
   right-click the app and choose *Open*.
