@@ -73,6 +73,109 @@ Categories (BISAC, e.g. FICTION / Science Fiction / Hard Science Fiction):
 Cover image: JPG or TIFF, at least 1600 × 2560 px (1.6:1 ratio) recommended.
 [/Notes]`;
 
+export const LYRICS_TEMPLATES: ManuscriptTemplate[] = [
+  {
+    id: 'song-structure',
+    label: 'Song (verse–chorus–bridge)',
+    placement: 'cursor',
+    content: `# Song Title
+
+## Verse 1
+
+
+
+## Chorus
+
+
+
+## Verse 2
+
+
+
+## Bridge`,
+  },
+  { id: 'verse', label: 'Verse', placement: 'cursor', content: '## Verse ' },
+  { id: 'chorus', label: 'Chorus', placement: 'cursor', content: '## Chorus' },
+  { id: 'bridge', label: 'Bridge', placement: 'cursor', content: '## Bridge' },
+];
+
+export const POETRY_TEMPLATES: ManuscriptTemplate[] = [
+  { id: 'poem', label: 'New poem', placement: 'cursor', content: '# Poem Title' },
+  {
+    id: 'haiku',
+    label: 'Haiku (5–7–5)',
+    placement: 'cursor',
+    content: `# Haiku
+
+[Notes]
+Three lines: 5, 7, then 5 syllables. A season word; a turn in the last line.
+[/Notes]`,
+  },
+  {
+    id: 'sonnet',
+    label: 'Sonnet (scaffold)',
+    placement: 'cursor',
+    content: `# Sonnet
+
+[Notes]
+14 lines of iambic pentameter. Shakespearean: three quatrains (ABAB CDCD
+EFEF) and a closing couplet (GG) that turns or resolves the argument.
+[/Notes]`,
+  },
+];
+
+export const SERMON_TEMPLATES: ManuscriptTemplate[] = [
+  {
+    id: 'sermon-outline',
+    label: 'Sermon outline',
+    placement: 'cursor',
+    content: `# Sermon Title
+
+[Notes]
+Date:
+Congregation:
+Text:
+Big idea — one sentence:
+[/Notes]
+
+## Opening
+
+## Scripture Reading
+
+## Point 1 —
+
+[Notes]
+Illustration:
+[/Notes]
+
+## Point 2 —
+
+[Notes]
+Illustration:
+[/Notes]
+
+## Point 3 —
+
+[Notes]
+Illustration:
+[/Notes]
+
+## Application
+
+## Closing`,
+  },
+  {
+    id: 'sermon-point',
+    label: 'Point (with illustration note)',
+    placement: 'cursor',
+    content: `## Point —
+
+[Notes]
+Illustration:
+[/Notes]`,
+  },
+];
+
 export const TEMPLATES: ManuscriptTemplate[] = [
   {
     id: 'front-matter-set',

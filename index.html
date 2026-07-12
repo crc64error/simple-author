@@ -44,6 +44,12 @@
           </select>
         </div>
         <div class="toolbar-right">
+          <select id="mode-select" class="theme-select" title="Writing mode">
+            <option value="book">Book</option>
+            <option value="lyrics">Lyrics</option>
+            <option value="poetry">Poetry</option>
+            <option value="sermon">Sermon</option>
+          </select>
           <select id="theme-select" class="theme-select" title="Interface theme">
             <option value="forest">Forest</option>
             <option value="midnight">Midnight</option>
@@ -98,21 +104,21 @@
 
       <footer class="status-bar">
         <div class="status-group">
-          <span class="status-label">Section</span>
-          <span id="section-words" class="status-value">0</span>
-          <span class="status-unit">words</span>
+          <span id="stat-0-label" class="status-label">Section</span>
+          <span id="stat-0-value" class="status-value">0</span>
+          <span id="stat-0-unit" class="status-unit">words</span>
         </div>
         <div class="status-divider"></div>
         <div class="status-group">
-          <span class="status-label">Chapter</span>
-          <span id="chapter-words" class="status-value">0</span>
-          <span class="status-unit">words</span>
+          <span id="stat-1-label" class="status-label">Chapter</span>
+          <span id="stat-1-value" class="status-value">0</span>
+          <span id="stat-1-unit" class="status-unit">words</span>
         </div>
         <div class="status-divider"></div>
         <div class="status-group">
-          <span class="status-label">Book</span>
-          <span id="book-words" class="status-value">0</span>
-          <span class="status-unit">words</span>
+          <span id="stat-2-label" class="status-label">Book</span>
+          <span id="stat-2-value" class="status-value">0</span>
+          <span id="stat-2-unit" class="status-unit">words</span>
         </div>
         <div class="status-spacer"></div>
         <div class="status-group status-hint">

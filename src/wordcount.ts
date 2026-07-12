@@ -43,6 +43,55 @@ export function countWords(text: string): number {
   return cleaned.split(/\s+/).filter((w) => w.length > 0).length;
 }
 
+// Verse/poem lines: content lines only — headings, blanks, and notes don't count.
+export function countLines(text: string): number {
+  return contentLines(stripNotes(text)).filter((line) => line !== '').length;
+}
+
+export function countStanzas(text: string): number {
+  const lines = contentLines(stripNotes(text));
+  let stanzas = 0;
+  let inStanza = false;
+  for (const line of lines) {
+    if (line === '') {
+      inStanza = false;
+    } else if (!inStanza) {
+      stanzas++;
+      inStanza = true;
+    }
+  }
+  return stanzas;
+}
+
+// Lines of the stanza (blank-line-delimited group) containing the cursor.
+export function stanzaLinesAt(doc: string, cursorPos: number): number {
+  const before = doc.slice(0, cursorPos);
+  const lineIdx = before.split('\n').length - 1;
+  const lines = doc.split('\n').map(normalizeContentLine);
+  if (lines[lineIdx] === '') return 0;
+
+  let count = 1;
+  for (let i = lineIdx - 1; i >= 0 && lines[i] !== ''; i--) count++;
+  for (let i = lineIdx + 1; i < lines.length && lines[i] !== ''; i++) count++;
+  return count;
+}
+
+const SPEAKING_WPM = 130;
+
+export function speakingMinutes(words: number): number {
+  return Math.round(words / SPEAKING_WPM);
+}
+
+function normalizeContentLine(line: string): string {
+  if (/^#{1,3}\s/.test(line)) return '';
+  if (/^\[(?:\/)?Notes\]$/i.test(line.trim())) return '';
+  return line.trim();
+}
+
+function contentLines(text: string): string[] {
+  return text.split('\n').map(normalizeContentLine);
+}
+
 export function findRegions(doc: string): { sections: DocumentRegion[]; chapters: DocumentRegion[] } {
   const lines = doc.split('\n');
   const sections: DocumentRegion[] = [];
@@ -131,6 +180,25 @@ function regionAtCursor(regions: DocumentRegion[], pos: number): DocumentRegion 
     if (pos >= regions[i].start) return regions[i];
   }
   return regions[0];
+}
+
+// The `#` and `##` region texts containing the cursor (whole doc when the
+// document has no headings yet).
+export function regionTextsAt(
+  doc: string,
+  cursorPos: number,
+): { sectionText: string; chapterText: string } {
+  const { sections, chapters } = findRegions(doc);
+  const section = regionAtCursor(sections, cursorPos);
+  const chapter = regionAtCursor(chapters, cursorPos);
+
+  const sectionText = section ? doc.slice(section.start, section.end) : doc;
+  const chapterText = chapter
+    ? doc.slice(chapter.start, chapter.end)
+    : section
+      ? sectionText
+      : doc;
+  return { sectionText, chapterText };
 }
 
 export function computeWordCounts(doc: string, cursorPos: number): WordCountSnapshot {

@@ -12,16 +12,19 @@ import {
 import { createPublishingModal } from './publishing-guide';
 import { createOutline } from './outline';
 import { createReminders } from './reminders';
-import { TEMPLATES } from './templates';
 import { initSpellcheck, refreshSpellcheck } from './spellcheck';
 import { setupContextMenu } from './context-menu';
 import { initThesaurus } from './thesaurus';
+import { computeStats, getMode, type WritingMode } from './modes';
 import { applyTheme, type ThemeId } from './themes';
 
-const chapterWordsEl = document.getElementById('chapter-words')!;
-const sectionWordsEl = document.getElementById('section-words')!;
-const bookWordsEl = document.getElementById('book-words')!;
+const statEls = [0, 1, 2].map((i) => ({
+  label: document.getElementById(`stat-${i}-label`)!,
+  value: document.getElementById(`stat-${i}-value`)!,
+  unit: document.getElementById(`stat-${i}-unit`)!,
+}));
 const cursorContextEl = document.getElementById('cursor-context')!;
+const modeSelect = document.getElementById('mode-select') as HTMLSelectElement;
 const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
 const exportSelect = document.getElementById('export-select') as HTMLSelectElement;
 const templateSelect = document.getElementById('template-select') as HTMLSelectElement;
@@ -30,16 +33,20 @@ const viewRenderedBtn = document.getElementById('btn-view-rendered') as HTMLButt
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
 const editorContainer = document.getElementById('editor-container')!;
 
-function formatNumber(n: number): string {
-  return n.toLocaleString();
-}
+let currentMode: WritingMode = getMode(localStorage.getItem('simple-writer-mode'));
+
+let lastSnapshot: EditorSnapshot | null = null;
 
 function updateUI(snapshot: EditorSnapshot): void {
+  lastSnapshot = snapshot;
   const { counts, doc, cursorPos } = snapshot;
 
-  chapterWordsEl.textContent = formatNumber(counts.chapterWords);
-  sectionWordsEl.textContent = formatNumber(counts.sectionWords);
-  bookWordsEl.textContent = formatNumber(counts.bookWords);
+  const stats = computeStats(currentMode, doc, cursorPos);
+  stats.forEach((stat, i) => {
+    statEls[i].label.textContent = stat.label;
+    statEls[i].value.textContent = stat.value;
+    statEls[i].unit.textContent = stat.unit;
+  });
 
   const parts: string[] = [];
   if (counts.sectionTitle !== '—') parts.push(counts.sectionTitle);
@@ -159,7 +166,7 @@ async function handleNew(): Promise<void> {
     if (!proceed) return;
   }
   resetCurrentFile();
-  editor.newDocument();
+  editor.newDocument(currentMode.blankDocument);
 }
 
 async function handleOpen(): Promise<void> {
@@ -189,15 +196,46 @@ async function handleSave(saveAs = false): Promise<void> {
 
 const publishModal = createPublishingModal();
 
-for (const template of TEMPLATES) {
-  const option = document.createElement('option');
-  option.value = template.id;
-  option.textContent = template.label;
-  templateSelect.appendChild(option);
+const sectionBtn = document.getElementById('btn-section') as HTMLButtonElement;
+const chapterBtn = document.getElementById('btn-chapter') as HTMLButtonElement;
+const outlineEmptyEl = document.querySelector('.outline-empty') as HTMLElement;
+
+function applyMode(mode: WritingMode): void {
+  currentMode = mode;
+  modeSelect.value = mode.id;
+
+  sectionBtn.innerHTML = `<span class="tool-icon">${mode.topIcon}</span> ${mode.topLabel}`;
+  sectionBtn.title = `${mode.topLabel} title (# )`;
+  chapterBtn.innerHTML = `<span class="tool-icon">${mode.subIcon}</span> ${mode.subLabel}`;
+  chapterBtn.title = `${mode.subLabel} title (## )`;
+
+  templateSelect.replaceChildren();
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Insert…';
+  templateSelect.appendChild(placeholder);
+  for (const template of mode.templates) {
+    const option = document.createElement('option');
+    option.value = template.id;
+    option.textContent = template.label;
+    templateSelect.appendChild(option);
+  }
+
+  outlineEmptyEl.innerHTML = mode.outlineEmptyHtml;
+  editor.setScriptureHighlight(mode.scriptureHighlight);
+  localStorage.setItem('simple-writer-mode', mode.id);
+
+  if (lastSnapshot) updateUI(lastSnapshot);
 }
 
+modeSelect.addEventListener('change', () => {
+  applyMode(getMode(modeSelect.value));
+});
+
+applyMode(currentMode);
+
 templateSelect.addEventListener('change', () => {
-  const template = TEMPLATES.find((t) => t.id === templateSelect.value);
+  const template = currentMode.templates.find((t) => t.id === templateSelect.value);
   if (template) editor.insertBlock(template.content, template.placement);
   templateSelect.value = '';
 });

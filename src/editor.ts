@@ -4,8 +4,10 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { invisiblesPlugin, invisiblesStyles, setShowInvisiblesEffect, showInvisiblesField } from './invisibles';
 import { markdownHighlight, markdownStyles, renderedModeField, setRenderedModeEffect } from './markdown';
 import { spellcheckPlugin } from './spellcheck';
+import { scriptureModeField, scripturePlugin, scriptureStyles, setScriptureModeEffect } from './scripture';
 import { editorTheme } from './themes';
 import { NOTE_CLOSE, NOTE_OPEN } from './notes';
+import { BLANK_DOCUMENTS } from './modes';
 import { computeWordCounts, type WordCountSnapshot } from './wordcount';
 
 export interface EditorSnapshot {
@@ -13,12 +15,6 @@ export interface EditorSnapshot {
   cursorPos: number;
   counts: WordCountSnapshot;
 }
-
-export const BLANK_DOCUMENT = `# Section 1 — 
-
-## Chapter One
-
-`;
 
 const WELCOME = `# Section 1 — Welcome
 
@@ -47,7 +43,8 @@ export interface WriterEditor {
   setShowNotes: (show: boolean) => void;
   setShowInvisibles: (show: boolean) => void;
   setRenderedMode: (on: boolean) => void;
-  newDocument: () => void;
+  setScriptureHighlight: (on: boolean) => void;
+  newDocument: (blank: string) => void;
   isEmpty: () => boolean;
 }
 
@@ -74,6 +71,9 @@ export function createEditor(
       markdownHighlight,
       showInvisiblesField,
       invisiblesPlugin,
+      scriptureModeField,
+      scripturePlugin,
+      scriptureStyles,
       spellcheckPlugin,
       EditorView.lineWrapping,
       EditorView.updateListener.of((update) => {
@@ -203,17 +203,20 @@ export function createEditor(
       view.dispatch({ effects: setRenderedModeEffect.of(on) });
       editorContainer.classList.toggle('rendered-mode', on);
     },
-    newDocument: () => {
+    setScriptureHighlight: (on: boolean) => {
+      view.dispatch({ effects: setScriptureModeEffect.of(on) });
+    },
+    newDocument: (blank: string) => {
       view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: BLANK_DOCUMENT },
-        selection: { anchor: BLANK_DOCUMENT.length },
+        changes: { from: 0, to: view.state.doc.length, insert: blank },
+        selection: { anchor: blank.length },
       });
-      localStorage.setItem('simple-writer-draft', BLANK_DOCUMENT);
+      localStorage.setItem('simple-writer-draft', blank);
       view.focus();
     },
     isEmpty: () => {
       const text = view.state.doc.toString().trim();
-      return text === '' || text === BLANK_DOCUMENT.trim();
+      return text === '' || BLANK_DOCUMENTS.some((blank) => text === blank.trim());
     },
   };
 }
