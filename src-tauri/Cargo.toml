@@ -1,6 +1,6 @@
 [package]
 name = "simple-author"
-version = "1.0.1"
+version = "1.0.2"
 description = "A distraction-free book writing editor"
 authors = ["Carey Scott Turner"]
 license = "GPL-3.0-only"
