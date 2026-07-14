@@ -1,14 +1,15 @@
 import './styles.css';
-import { createEditor, type EditorSnapshot } from './editor';
+import { createEditor, WELCOME, type EditorSnapshot } from './editor';
 import { downloadBlob, getExportBlob } from './export';
 import { setupAppMenu } from './menu';
 import {
   isDesktopApp,
   openManuscript,
-  resetCurrentFile,
   saveExportBlob,
   saveManuscript,
+  setWindowTitle,
 } from './platform';
+import { createTabs, type TabsApi } from './tabs';
 import { createPublishingModal } from './publishing-guide';
 import { createOutline } from './outline';
 import { createReminders } from './reminders';
@@ -34,6 +35,7 @@ const fileInput = document.getElementById('file-input') as HTMLInputElement;
 const editorContainer = document.getElementById('editor-container')!;
 
 let currentMode: WritingMode = getMode(localStorage.getItem('simple-writer-mode'));
+let tabsApi: TabsApi | null = null;
 
 let lastSnapshot: EditorSnapshot | null = null;
 
@@ -54,6 +56,7 @@ function updateUI(snapshot: EditorSnapshot): void {
   cursorContextEl.textContent = parts.length > 0 ? parts.join(' · ') : '';
 
   outline.update(doc, cursorPos);
+  tabsApi?.refreshTitle(doc);
 }
 
 function loadTheme(): ThemeId {
@@ -106,6 +109,7 @@ const editor = createEditor(
   document.getElementById('editor')!,
   editorContainer,
   updateUI,
+  () => tabsApi?.draftKey() ?? 'simple-writer-draft',
 );
 
 scrollToPosition = (pos) => editor.scrollTo(pos);
@@ -158,22 +162,15 @@ function toggleMarks(): void {
   localStorage.setItem('simple-writer-show-marks', String(visible));
 }
 
-async function handleNew(): Promise<void> {
-  if (!editor.isEmpty()) {
-    const proceed = confirm(
-      'Start a new file? Your current manuscript will be replaced. Save first if you want to keep a copy.',
-    );
-    if (!proceed) return;
-  }
-  resetCurrentFile();
-  editor.newDocument(currentMode.blankDocument);
+function handleNew(): void {
+  tabsApi?.newTab(currentMode.blankDocument, currentMode.id);
 }
 
 async function handleOpen(): Promise<void> {
   if (isDesktopApp()) {
     try {
-      const text = await openManuscript();
-      if (text !== null) editor.setContent(text);
+      const opened = await openManuscript();
+      if (opened) tabsApi?.openDocument(opened.path, opened.text);
     } catch (error) {
       console.error('Failed to open manuscript:', error);
     }
@@ -184,14 +181,19 @@ async function handleOpen(): Promise<void> {
 
 async function handleSave(saveAs = false): Promise<void> {
   const content = editor.getContent();
+  const tab = tabsApi?.activeTab();
 
   if (isDesktopApp()) {
-    const saved = await saveManuscript(content, saveAs);
-    if (!saved && !saveAs) await saveManuscript(content, true);
+    const path = await saveManuscript(content, tab?.filePath ?? null, saveAs);
+    if (path) {
+      tabsApi?.markSaved(path);
+      void setWindowTitle(path);
+    }
     return;
   }
 
   downloadBlob(new Blob([content], { type: 'text/markdown' }), 'manuscript.md');
+  tabsApi?.markSaved(null);
 }
 
 const publishModal = createPublishingModal();
@@ -229,10 +231,27 @@ function applyMode(mode: WritingMode): void {
 }
 
 modeSelect.addEventListener('change', () => {
-  applyMode(getMode(modeSelect.value));
+  const mode = getMode(modeSelect.value);
+  applyMode(mode);
+  tabsApi?.setActiveMode(mode.id);
 });
 
-applyMode(currentMode);
+tabsApi = createTabs({
+  container: document.getElementById('tab-bar')!,
+  createState: (content) => editor.createDocState(content),
+  getViewState: () => editor.getState(),
+  setViewState: (state) => editor.setState(state),
+  onActivate: (tab) => {
+    applyMode(getMode(tab.modeId));
+    // StateFields live inside each tab's EditorState, so global view
+    // settings must be re-asserted after a swap.
+    editor.setShowInvisibles(marksToggle.getAttribute('aria-pressed') === 'true');
+    editor.setRenderedMode(viewMode === 'rendered');
+    void setWindowTitle(tab.filePath);
+  },
+  defaultModeId: () => currentMode.id,
+  welcome: WELCOME,
+});
 
 templateSelect.addEventListener('change', () => {
   const template = currentMode.templates.find((t) => t.id === templateSelect.value);
@@ -308,7 +327,7 @@ fileInput.addEventListener('change', async () => {
   const file = fileInput.files?.[0];
   if (!file) return;
   const text = await file.text();
-  editor.setContent(text);
+  tabsApi?.openDocument(null, text);
   fileInput.value = '';
 });
 

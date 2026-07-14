@@ -11,6 +11,11 @@ and your manuscript never leave your machine.
 
 - **Plain-markdown manuscripts** — sections (`#`) and chapters (`##`) build a
   live outline; your book is a portable `.md` file, never a proprietary format
+- **Tabs** — several documents open at once, each with its own undo history,
+  cursor position, and writing mode; open tabs are restored on relaunch
+- **Writing modes** — Book, Lyrics, Poetry, and Sermon: the structure buttons,
+  counts (words, lines, stanzas, estimated speaking time), and templates adapt
+  to what you're writing; sermon mode highlights scripture references
 - **Two views** — raw markdown, or a rendered mode that hides the markup
   except on the line you're editing
 - **Author notes** — `[Notes]…[/Notes]` blocks stay visible while you write

@@ -7,34 +7,23 @@ const MANUSCRIPT_FILTERS = [
   },
 ];
 
-let currentFilePath: string | null = null;
-
 export function isDesktopApp(): boolean {
   return isTauri();
 }
 
-export function getCurrentFilePath(): string | null {
-  return currentFilePath;
-}
-
-export function getDisplayTitle(): string {
-  if (!currentFilePath) return 'Simple Author';
-  const parts = currentFilePath.split(/[/\\]/);
-  return `${parts[parts.length - 1]} — Simple Author`;
-}
-
-async function setWindowTitle(): Promise<void> {
+export async function setWindowTitle(filePath: string | null): Promise<void> {
   if (!isDesktopApp()) return;
   try {
     const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-    await getCurrentWebviewWindow().setTitle(getDisplayTitle());
+    const name = filePath ? filePath.split(/[/\\]/).pop() : null;
+    await getCurrentWebviewWindow().setTitle(name ? `${name} — Simple Author` : 'Simple Author');
   } catch (error) {
     // A title update should never block opening or saving the manuscript.
     console.error('Failed to set window title:', error);
   }
 }
 
-export async function openManuscript(): Promise<string | null> {
+export async function openManuscript(): Promise<{ path: string; text: string } | null> {
   if (!isDesktopApp()) return null;
 
   const { open } = await import('@tauri-apps/plugin-dialog');
@@ -48,36 +37,33 @@ export async function openManuscript(): Promise<string | null> {
 
   if (!selected || typeof selected !== 'string') return null;
 
-  currentFilePath = selected;
-  await setWindowTitle();
-  return readTextFile(selected);
+  return { path: selected, text: await readTextFile(selected) };
 }
 
-export async function saveManuscript(content: string, saveAs = false): Promise<boolean> {
-  if (!isDesktopApp()) return false;
+// Saves to `currentPath` when known (unless saveAs); otherwise prompts.
+// Returns the path written to, or null if the user cancelled.
+export async function saveManuscript(
+  content: string,
+  currentPath: string | null,
+  saveAs = false,
+): Promise<string | null> {
+  if (!isDesktopApp()) return null;
 
   const { save } = await import('@tauri-apps/plugin-dialog');
   const { writeTextFile } = await import('@tauri-apps/plugin-fs');
 
-  let target = currentFilePath;
+  let target = currentPath;
   if (!target || saveAs) {
     const selected = await save({
-      defaultPath: currentFilePath ?? 'manuscript.md',
+      defaultPath: currentPath ?? 'manuscript.md',
       filters: MANUSCRIPT_FILTERS,
     });
-    if (!selected || typeof selected !== 'string') return false;
+    if (!selected || typeof selected !== 'string') return null;
     target = selected;
-    currentFilePath = target;
   }
 
   await writeTextFile(target, content);
-  await setWindowTitle();
-  return true;
-}
-
-export function resetCurrentFile(): void {
-  currentFilePath = null;
-  void setWindowTitle();
+  return target;
 }
 
 export async function saveExportBlob(filename: string, blob: Blob): Promise<boolean> {

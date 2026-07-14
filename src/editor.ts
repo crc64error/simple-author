@@ -7,7 +7,6 @@ import { spellcheckPlugin } from './spellcheck';
 import { scriptureModeField, scripturePlugin, scriptureStyles, setScriptureModeEffect } from './scripture';
 import { editorTheme } from './themes';
 import { NOTE_CLOSE, NOTE_OPEN } from './notes';
-import { BLANK_DOCUMENTS } from './modes';
 import { computeWordCounts, type WordCountSnapshot } from './wordcount';
 
 export interface EditorSnapshot {
@@ -16,7 +15,7 @@ export interface EditorSnapshot {
   counts: WordCountSnapshot;
 }
 
-const WELCOME = `# Section 1 — Welcome
+export const WELCOME = `# Section 1 — Welcome
 
 ## Chapter One
 
@@ -35,6 +34,9 @@ export interface WriterEditor {
   view: EditorView;
   getContent: () => string;
   setContent: (text: string) => void;
+  createDocState: (content: string) => EditorState;
+  getState: () => EditorState;
+  setState: (state: EditorState) => void;
   wrapSelection: (before: string, after: string) => void;
   insertLinePrefix: (prefix: string) => void;
   scrollTo: (pos: number) => void;
@@ -44,8 +46,6 @@ export interface WriterEditor {
   setShowInvisibles: (show: boolean) => void;
   setRenderedMode: (on: boolean) => void;
   setScriptureHighlight: (on: boolean) => void;
-  newDocument: (blank: string) => void;
-  isEmpty: () => boolean;
 }
 
 function emitSnapshot(view: EditorView, onUpdate: (snapshot: EditorSnapshot) => void): void {
@@ -58,36 +58,42 @@ export function createEditor(
   parent: HTMLElement,
   editorContainer: HTMLElement,
   onUpdate: (snapshot: EditorSnapshot) => void,
+  getDraftKey: () => string,
 ): WriterEditor {
-  const state = EditorState.create({
-    doc: loadDraft() ?? WELCOME,
-    extensions: [
-      history(),
-      keymap.of([...defaultKeymap, ...historyKeymap]),
-      editorTheme(),
-      markdownStyles,
-      invisiblesStyles,
-      renderedModeField,
-      markdownHighlight,
-      showInvisiblesField,
-      invisiblesPlugin,
-      scriptureModeField,
-      scripturePlugin,
-      scriptureStyles,
-      spellcheckPlugin,
-      EditorView.lineWrapping,
-      EditorView.updateListener.of((update) => {
-        if (update.docChanged) {
-          localStorage.setItem('simple-writer-draft', update.state.doc.toString());
+  // Shared by every tab's EditorState, so each tab keeps its own document,
+  // selection, and undo history while behaving identically.
+  const extensions = [
+    history(),
+    keymap.of([...defaultKeymap, ...historyKeymap]),
+    editorTheme(),
+    markdownStyles,
+    invisiblesStyles,
+    renderedModeField,
+    markdownHighlight,
+    showInvisiblesField,
+    invisiblesPlugin,
+    scriptureModeField,
+    scripturePlugin,
+    scriptureStyles,
+    spellcheckPlugin,
+    EditorView.lineWrapping,
+    EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        try {
+          localStorage.setItem(getDraftKey(), update.state.doc.toString());
+        } catch {
+          /* storage unavailable */
         }
-        if (update.docChanged || update.selectionSet) {
-          emitSnapshot(update.view, onUpdate);
-        }
-      }),
-    ],
-  });
+      }
+      if (update.docChanged || update.selectionSet) {
+        emitSnapshot(update.view, onUpdate);
+      }
+    }),
+  ];
 
-  const view = new EditorView({ state, parent });
+  const createDocState = (content: string) => EditorState.create({ doc: content, extensions });
+
+  const view = new EditorView({ state: createDocState(''), parent });
 
   // Line heights are measured with the fallback font until Crimson Pro
   // arrives; without a re-measure, clicks resolve against stale geometry.
@@ -98,6 +104,12 @@ export function createEditor(
   return {
     view,
     getContent: () => view.state.doc.toString(),
+    createDocState,
+    getState: () => view.state,
+    setState: (state: EditorState) => {
+      view.setState(state);
+      emitSnapshot(view, onUpdate);
+    },
     setContent: (text: string) => {
       // Pin the cursor to the start of the newly opened document. Leaving it
       // to selection mapping can strand the caret off-screen, and WebKit
@@ -206,25 +218,5 @@ export function createEditor(
     setScriptureHighlight: (on: boolean) => {
       view.dispatch({ effects: setScriptureModeEffect.of(on) });
     },
-    newDocument: (blank: string) => {
-      view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: blank },
-        selection: { anchor: blank.length },
-      });
-      localStorage.setItem('simple-writer-draft', blank);
-      view.focus();
-    },
-    isEmpty: () => {
-      const text = view.state.doc.toString().trim();
-      return text === '' || BLANK_DOCUMENTS.some((blank) => text === blank.trim());
-    },
   };
-}
-
-function loadDraft(): string | null {
-  try {
-    return localStorage.getItem('simple-writer-draft');
-  } catch {
-    return null;
-  }
 }
