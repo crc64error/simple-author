@@ -124,7 +124,10 @@ Goals get checked off as they ship. Ideas and votes welcome in the
       suggestions, personal dictionary, EPUB export, KDP templates
 - [x] **v1.0.1** — Writing modes: Book, Lyrics, Poetry, and Sermon (speaking
       time estimate, scripture highlighting)
-- [ ] **v1.0.2** — Tabs: multiple documents open at once *(in progress)*
+- [x] **v1.0.2 (beta)** — Tabs (multiple documents open at once), per-line
+      syllable counts and rhyme finder for poetry, Suno integration for
+      lyrics (style prompt with character budget, performance tags,
+      copy-for-Suno export)
 
 ## Building from source
 
