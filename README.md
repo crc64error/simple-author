@@ -54,6 +54,64 @@ Or use the [web version](https://crc64error.github.io/simple-author/) — same
 editor, running entirely in your browser (files open/save through the
 browser's download mechanism instead of native dialogs).
 
+## Roadmap
+
+Goals get checked off as they ship. Ideas and votes welcome in the
+[issues](https://github.com/crc64error/simple-author/issues).
+
+### Artwork & covers (Book mode)
+
+- [ ] Attach cover art to a manuscript (kept with the book, shown in-app)
+- [ ] Embed the cover in EPUB export so Kindle and e-readers display it
+- [ ] Cover preview with KDP dimension checks (≥ 1600 × 2560 px, 1.6:1 ratio)
+- [ ] Back-cover art and blurb layout for print editions
+- [ ] Full-wrap cover template (front + spine + back) sized from page count
+
+### Interface translations
+
+- [ ] Extract all interface strings into locale files
+- [ ] Portuguese interface translation
+- [ ] Language picker with system-language detection
+- [ ] Translation guide so others can contribute languages
+
+### Dictionaries & reference tools
+
+- [ ] Dictionary manager: download and enable spelling dictionaries for more
+      languages (Hunspell format)
+- [ ] Downloadable thesauri for languages beyond English
+- [ ] Import / export the personal dictionary
+- [ ] Per-book word lists (character names, places, invented terms)
+
+### Print
+
+- [ ] Print / PDF export with page setup: trim size, margins, fonts
+- [ ] Headers, footers, page numbers, and chapter page breaks
+- [ ] KDP paperback-ready PDF (6×9 in and other trim sizes)
+- [ ] Print directly from the app
+
+### Secure storage
+
+- [ ] Password-protected manuscripts, encrypted at rest (AES-256)
+- [ ] Lock / unlock flow with automatic locking when idle
+- [ ] Encrypted rotating backups so a bad save never loses a book
+- [ ] Clear passphrase-loss warning (no recovery without it — by design)
+
+### Small improvements
+
+- [ ] Keyboard shortcuts for switching and reordering tabs
+- [ ] Drag to reorder tabs
+- [ ] Syllable counts in Poetry mode
+- [ ] Chord notation in Lyrics mode (ChordPro-style `[G]` markers)
+
+### Shipped
+
+- [x] **v1.0.0** — Mac / Windows / Linux builds, browser version, offline
+      spellcheck (English + Portuguese), offline thesaurus, right-click
+      suggestions, personal dictionary, EPUB export, KDP templates
+- [x] **v1.0.1** — Writing modes: Book, Lyrics, Poetry, and Sermon (speaking
+      time estimate, scripture highlighting)
+- [ ] **v1.0.2** — Tabs: multiple documents open at once *(in progress)*
+
 ## Building from source
 
 Prerequisites: [Node.js](https://nodejs.org) 20+, [Rust](https://rustup.rs),
