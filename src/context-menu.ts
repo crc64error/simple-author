@@ -9,6 +9,11 @@ import {
   WORD_REGEX_SOURCE,
 } from './spellcheck';
 import { lookupSynonyms } from './thesaurus';
+import { lookupRhymes } from './phonetics';
+
+export interface ContextMenuOptions {
+  showRhymes: () => boolean;
+}
 
 interface WordHit {
   from: number;
@@ -16,7 +21,7 @@ interface WordHit {
   text: string;
 }
 
-export function setupContextMenu(view: EditorView): void {
+export function setupContextMenu(view: EditorView, options: ContextMenuOptions): void {
   const menu = document.createElement('div');
   menu.className = 'ctx-menu';
   menu.hidden = true;
@@ -133,6 +138,35 @@ export function setupContextMenu(view: EditorView): void {
     });
   }
 
+  function buildRhymeSection(hit: WordHit): void {
+    const section = document.createElement('div');
+    menu.appendChild(section);
+    const pending = addLabel(section, 'Rhymes — looking up…');
+
+    const token = openToken;
+    void lookupRhymes(hit.text, (w) => !isMisspelled(w)).then((result) => {
+      if (token !== openToken) return;
+      pending.remove();
+      if (!result) {
+        addLabel(section, 'No rhymes found');
+        return;
+      }
+      if (result.perfect.length > 0) {
+        addLabel(section, 'Rhymes');
+        for (const word of result.perfect) {
+          addItem(section, word, () => replaceRange(hit, matchCase(hit.text, word)));
+        }
+      }
+      if (result.slant.length > 0) {
+        addLabel(section, 'Near rhymes');
+        for (const word of result.slant) {
+          addItem(section, word, () => replaceRange(hit, matchCase(hit.text, word)));
+        }
+      }
+      place(anchorX, anchorY);
+    });
+  }
+
   function buildMenu(hit: WordHit | null): void {
     menu.replaceChildren();
 
@@ -159,6 +193,10 @@ export function setupContextMenu(view: EditorView): void {
         addSeparator(menu);
       }
       buildSynonymSection(hit);
+      if (options.showRhymes()) {
+        addSeparator(menu);
+        buildRhymeSection(hit);
+      }
       addSeparator(menu);
     }
 

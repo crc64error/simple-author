@@ -1,5 +1,6 @@
-import { EditorState } from '@codemirror/state';
+import { Compartment, EditorState } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
+import { syllableGutter } from './syllable-gutter';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { invisiblesPlugin, invisiblesStyles, setShowInvisiblesEffect, showInvisiblesField } from './invisibles';
 import { markdownHighlight, markdownStyles, renderedModeField, setRenderedModeEffect } from './markdown';
@@ -46,6 +47,7 @@ export interface WriterEditor {
   setShowInvisibles: (show: boolean) => void;
   setRenderedMode: (on: boolean) => void;
   setScriptureHighlight: (on: boolean) => void;
+  setSyllableGutter: (on: boolean) => void;
 }
 
 function emitSnapshot(view: EditorView, onUpdate: (snapshot: EditorSnapshot) => void): void {
@@ -60,9 +62,12 @@ export function createEditor(
   onUpdate: (snapshot: EditorSnapshot) => void,
   getDraftKey: () => string,
 ): WriterEditor {
+  const syllableCompartment = new Compartment();
+
   // Shared by every tab's EditorState, so each tab keeps its own document,
   // selection, and undo history while behaving identically.
   const extensions = [
+    syllableCompartment.of([]),
     history(),
     keymap.of([...defaultKeymap, ...historyKeymap]),
     editorTheme(),
@@ -217,6 +222,11 @@ export function createEditor(
     },
     setScriptureHighlight: (on: boolean) => {
       view.dispatch({ effects: setScriptureModeEffect.of(on) });
+    },
+    setSyllableGutter: (on: boolean) => {
+      view.dispatch({
+        effects: syllableCompartment.reconfigure(on ? syllableGutter() : []),
+      });
     },
   };
 }

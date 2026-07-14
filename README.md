@@ -96,12 +96,22 @@ Goals get checked off as they ship. Ideas and votes welcome in the
 - [ ] Encrypted rotating backups so a bad save never loses a book
 - [ ] Clear passphrase-loss warning (no recovery without it — by design)
 
+### Poetry & lyric tools
+
+- [x] Per-line syllable counts in Poetry mode (CMU Pronouncing Dictionary,
+      with a heuristic fallback for names and invented words) *(v1.0.2)*
+- [x] Rhyme finder in the right-click menu — perfect and near rhymes, offline
+      *(v1.0.2)*
+- [ ] Rhyme scheme coloring: line endings that rhyme get matching tags
+- [ ] Meter and stress-pattern display
+- [ ] Chord notation in Lyrics mode (ChordPro-style `[G]` markers) with
+      show/hide and transpose
+- [ ] Portuguese syllable counting and rhymes
+
 ### Small improvements
 
 - [ ] Keyboard shortcuts for switching and reordering tabs
 - [ ] Drag to reorder tabs
-- [ ] Syllable counts in Poetry mode
-- [ ] Chord notation in Lyrics mode (ChordPro-style `[G]` markers)
 
 ### Shipped
 

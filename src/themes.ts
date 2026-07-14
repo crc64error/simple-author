@@ -157,7 +157,9 @@ export function editorTheme(): Extension {
       backgroundColor: 'var(--selection) !important',
     },
     '.cm-gutters': {
-      display: 'none',
+      backgroundColor: 'transparent',
+      border: 'none',
+      color: 'var(--text-muted)',
     },
     '.cm-activeLine': {
       backgroundColor: 'transparent',

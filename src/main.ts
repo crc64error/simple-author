@@ -16,6 +16,8 @@ import { createReminders } from './reminders';
 import { initSpellcheck, refreshSpellcheck } from './spellcheck';
 import { setupContextMenu } from './context-menu';
 import { initThesaurus } from './thesaurus';
+import { initPhonetics } from './phonetics';
+import { syllablesRefreshEffect } from './syllable-gutter';
 import { computeStats, getMode, type WritingMode } from './modes';
 import { applyTheme, type ThemeId } from './themes';
 
@@ -225,6 +227,7 @@ function applyMode(mode: WritingMode): void {
 
   outlineEmptyEl.innerHTML = mode.outlineEmptyHtml;
   editor.setScriptureHighlight(mode.scriptureHighlight);
+  editor.setSyllableGutter(mode.id === 'poetry');
   localStorage.setItem('simple-writer-mode', mode.id);
 
   if (lastSnapshot) updateUI(lastSnapshot);
@@ -335,8 +338,14 @@ initSpellcheck().then(() => {
   refreshSpellcheck(editor.view);
 });
 
-setupContextMenu(editor.view);
+setupContextMenu(editor.view, {
+  showRhymes: () => currentMode.id === 'poetry' || currentMode.id === 'lyrics',
+});
 void initThesaurus();
+void initPhonetics().then(() => {
+  // Correct any heuristic syllable counts rendered before the dictionary loaded.
+  editor.view.dispatch({ effects: syllablesRefreshEffect.of() });
+});
 
 setupAppMenu({
   onNew: () => {

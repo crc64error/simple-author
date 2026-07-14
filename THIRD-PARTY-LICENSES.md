@@ -24,6 +24,13 @@ Copyright Princeton University, and used under the WordNet License
 (https://wordnet.princeton.edu/license-and-commercial-use), which permits use,
 copying, and redistribution with this notice.
 
+## Pronunciation dictionary (`public/dicts/cmudict.dict`)
+
+The **CMU Pronouncing Dictionary**, Copyright Carnegie Mellon University
+(https://github.com/cmusphinx/cmudict), used for syllable counts and rhyme
+lookup. Licensed under the **BSD 2-Clause license**: redistribution permitted
+with this notice.
+
 ## Spelling dictionaries (`public/dicts/`)
 
 - **English** (`en.aff`, `en.dic`) — Hunspell en_US dictionary, derived from
