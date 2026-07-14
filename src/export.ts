@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { stripNotes } from './notes';
+import { stripStyleBlocks } from './suno';
 
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -25,11 +26,11 @@ function inlineMarkup(text: string): string {
 }
 
 export function toPublishMarkdown(doc: string): string {
-  return stripNotes(doc).trimEnd() + '\n';
+  return stripNotes(stripStyleBlocks(doc)).trimEnd() + '\n';
 }
 
 export function toPlainText(doc: string): string {
-  return stripNotes(doc)
+  return stripNotes(stripStyleBlocks(doc))
     .replace(/^#{1,3}\s+/gm, '')
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/_([^_]+)_/g, '$1')
@@ -111,7 +112,7 @@ function sectionXhtml(title: string): string {
 }
 
 export async function toEpub(doc: string, title = "Manuscript"): Promise<Blob> {
-  const clean = stripNotes(doc);
+  const clean = stripNotes(stripStyleBlocks(doc));
   const structure = parsePublishStructure(clean);
   const zip = new JSZip();
 

@@ -97,6 +97,20 @@ export const LYRICS_TEMPLATES: ManuscriptTemplate[] = [
   { id: 'verse', label: 'Verse', placement: 'cursor', content: '## Verse ' },
   { id: 'chorus', label: 'Chorus', placement: 'cursor', content: '## Chorus' },
   { id: 'bridge', label: 'Bridge', placement: 'cursor', content: '## Bridge' },
+  {
+    id: 'suno-style',
+    label: 'Suno style prompt (top)',
+    placement: 'top',
+    content: `[Style]
+dreamy indie folk, intimate female vocals, fingerpicked acoustic guitar, brushed drums, warm and hopeful, moderate tempo
+[/Style]`,
+  },
+  {
+    id: 'suno-tag',
+    label: 'Performance tag',
+    placement: 'cursor',
+    content: '[building vocals, female lead]',
+  },
 ];
 
 export const POETRY_TEMPLATES: ManuscriptTemplate[] = [

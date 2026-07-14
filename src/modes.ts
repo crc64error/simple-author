@@ -14,6 +14,7 @@ import {
   countStanzas,
 } from './wordcount';
 import { stripNotes } from './notes';
+import { stripStyleBlocks } from './suno';
 
 export type WritingModeId = 'book' | 'lyrics' | 'poetry' | 'sermon';
 
@@ -90,9 +91,9 @@ export const MODES: WritingMode[] = [
     templates: LYRICS_TEMPLATES,
     scriptureHighlight: false,
     stats: ({ doc, sectionText, chapterText }) => [
-      { label: 'Song', value: n(countLines(sectionText)), unit: 'lines' },
-      { label: 'Part', value: n(countLines(chapterText)), unit: 'lines' },
-      { label: 'All', value: n(words(doc)), unit: 'words' },
+      { label: 'Song', value: n(countLines(stripStyleBlocks(sectionText))), unit: 'lines' },
+      { label: 'Part', value: n(countLines(stripStyleBlocks(chapterText))), unit: 'lines' },
+      { label: 'All', value: n(words(stripStyleBlocks(doc))), unit: 'words' },
     ],
   },
   {

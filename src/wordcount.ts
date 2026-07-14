@@ -84,7 +84,9 @@ export function speakingMinutes(words: number): number {
 
 function normalizeContentLine(line: string): string {
   if (/^#{1,3}\s/.test(line)) return '';
-  if (/^\[(?:\/)?Notes\]$/i.test(line.trim())) return '';
+  // Bracket-only lines are structure or direction ([Notes], [Style],
+  // [Building vocals]) — never countable content.
+  if (/^\[[^\][]*\]$/.test(line.trim())) return '';
   return line.trim();
 }
 

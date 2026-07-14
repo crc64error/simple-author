@@ -6,6 +6,7 @@ import { invisiblesPlugin, invisiblesStyles, setShowInvisiblesEffect, showInvisi
 import { markdownHighlight, markdownStyles, renderedModeField, setRenderedModeEffect } from './markdown';
 import { spellcheckPlugin } from './spellcheck';
 import { scriptureModeField, scripturePlugin, scriptureStyles, setScriptureModeEffect } from './scripture';
+import { lyricsModeField, setLyricsModeEffect, sunoPlugin, sunoStyles } from './suno';
 import { editorTheme } from './themes';
 import { NOTE_CLOSE, NOTE_OPEN } from './notes';
 import { computeWordCounts, type WordCountSnapshot } from './wordcount';
@@ -47,6 +48,7 @@ export interface WriterEditor {
   setShowInvisibles: (show: boolean) => void;
   setRenderedMode: (on: boolean) => void;
   setScriptureHighlight: (on: boolean) => void;
+  setLyricsHighlight: (on: boolean) => void;
   setSyllableGutter: (on: boolean) => void;
 }
 
@@ -80,6 +82,9 @@ export function createEditor(
     scriptureModeField,
     scripturePlugin,
     scriptureStyles,
+    lyricsModeField,
+    sunoPlugin,
+    sunoStyles,
     spellcheckPlugin,
     EditorView.lineWrapping,
     EditorView.updateListener.of((update) => {
@@ -222,6 +227,9 @@ export function createEditor(
     },
     setScriptureHighlight: (on: boolean) => {
       view.dispatch({ effects: setScriptureModeEffect.of(on) });
+    },
+    setLyricsHighlight: (on: boolean) => {
+      view.dispatch({ effects: setLyricsModeEffect.of(on) });
     },
     setSyllableGutter: (on: boolean) => {
       view.dispatch({

@@ -19,6 +19,7 @@ import { initThesaurus } from './thesaurus';
 import { initPhonetics } from './phonetics';
 import { syllablesRefreshEffect } from './syllable-gutter';
 import { computeStats, getMode, type WritingMode } from './modes';
+import { buildSunoLyrics, getStylePrompt, SUNO_STYLE_LIMIT } from './suno';
 import { applyTheme, type ThemeId } from './themes';
 
 const statEls = [0, 1, 2].map((i) => ({
@@ -28,6 +29,7 @@ const statEls = [0, 1, 2].map((i) => ({
 }));
 const cursorContextEl = document.getElementById('cursor-context')!;
 const modeSelect = document.getElementById('mode-select') as HTMLSelectElement;
+const sunoSelect = document.getElementById('suno-select') as HTMLSelectElement;
 const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
 const exportSelect = document.getElementById('export-select') as HTMLSelectElement;
 const templateSelect = document.getElementById('template-select') as HTMLSelectElement;
@@ -227,7 +229,9 @@ function applyMode(mode: WritingMode): void {
 
   outlineEmptyEl.innerHTML = mode.outlineEmptyHtml;
   editor.setScriptureHighlight(mode.scriptureHighlight);
+  editor.setLyricsHighlight(mode.id === 'lyrics');
   editor.setSyllableGutter(mode.id === 'poetry');
+  sunoSelect.hidden = mode.id !== 'lyrics';
   localStorage.setItem('simple-writer-mode', mode.id);
 
   if (lastSnapshot) updateUI(lastSnapshot);
@@ -260,6 +264,39 @@ templateSelect.addEventListener('change', () => {
   const template = currentMode.templates.find((t) => t.id === templateSelect.value);
   if (template) editor.insertBlock(template.content, template.placement);
   templateSelect.value = '';
+});
+
+function flashSunoFeedback(text: string): void {
+  const placeholder = sunoSelect.options[0];
+  const original = placeholder.textContent;
+  placeholder.textContent = text;
+  setTimeout(() => {
+    placeholder.textContent = original;
+  }, 1500);
+}
+
+sunoSelect.addEventListener('change', () => {
+  const choice = sunoSelect.value;
+  sunoSelect.value = '';
+  const doc = editor.getContent();
+
+  if (choice === 'style') {
+    const prompt = getStylePrompt(doc);
+    if (!prompt) {
+      flashSunoFeedback('No [Style] block');
+      return;
+    }
+    void navigator.clipboard.writeText(prompt).then(() => {
+      flashSunoFeedback(prompt.length > SUNO_STYLE_LIMIT ? `Copied — over ${SUNO_STYLE_LIMIT}!` : 'Copied ✓');
+    });
+  } else if (choice === 'lyrics') {
+    const lyrics = buildSunoLyrics(doc);
+    if (!lyrics) {
+      flashSunoFeedback('Nothing to copy');
+      return;
+    }
+    void navigator.clipboard.writeText(lyrics).then(() => flashSunoFeedback('Copied ✓'));
+  }
 });
 
 viewMarkdownBtn.addEventListener('click', () => setViewMode('markdown'));
