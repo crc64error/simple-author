@@ -186,18 +186,24 @@ async function handleOpen(): Promise<void> {
 async function handleSave(saveAs = false): Promise<void> {
   const content = editor.getContent();
   const tab = tabsApi?.activeTab();
+  if (!tab) return;
 
   if (isDesktopApp()) {
-    const path = await saveManuscript(content, tab?.filePath ?? null, saveAs);
+    // Capture the tab id now: the save dialog awaited below hands control
+    // back to the user, who may switch tabs before it resolves. The write
+    // must land on the tab that was active when Save was clicked, not
+    // whichever tab happens to be active once the promise settles.
+    const path = await saveManuscript(content, tab.filePath, saveAs);
     if (path) {
-      tabsApi?.markSaved(path);
-      void setWindowTitle(path);
+      tabsApi?.markSaved(tab.id, path, content);
+      // Only retitle the window if the saved tab is still the one showing.
+      if (tabsApi?.activeTab().id === tab.id) void setWindowTitle(path);
     }
     return;
   }
 
   downloadBlob(new Blob([content], { type: 'text/markdown' }), 'manuscript.md');
-  tabsApi?.markSaved(null);
+  tabsApi?.markSaved(tab.id, null, content);
 }
 
 const publishModal = createPublishingModal();

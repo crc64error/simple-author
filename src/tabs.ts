@@ -26,7 +26,10 @@ export interface TabsApi {
   draftKey: () => string;
   newTab: (content: string, modeId: WritingModeId) => void;
   openDocument: (filePath: string | null, text: string) => void;
-  markSaved: (filePath: string | null) => void;
+  // tabId pins the write to the tab that was active when the save started —
+  // the user may switch tabs while the OS save dialog is up, so `activeId`
+  // can no longer be trusted by the time this resolves.
+  markSaved: (tabId: string, filePath: string | null, content: string) => void;
   setActiveMode: (modeId: WritingModeId) => void;
   refreshTitle: (doc: string) => void;
 }
@@ -275,11 +278,11 @@ export function createTabs(options: TabsOptions): TabsApi {
       }
       addTab(text, options.defaultModeId(), filePath, text);
     },
-    markSaved: (filePath) => {
-      const tab = tabs.find((t) => t.id === activeId);
+    markSaved: (tabId, filePath, content) => {
+      const tab = tabs.find((t) => t.id === tabId);
       if (!tab) return;
       if (filePath) tab.filePath = filePath;
-      tab.savedContent = getViewState().doc.toString();
+      tab.savedContent = content;
       persist();
       render();
     },
