@@ -128,6 +128,11 @@ Goals get checked off as they ship. Ideas and votes welcome in the
       syllable counts and rhyme finder for poetry, Suno integration for
       lyrics (style prompt with character budget, performance tags,
       copy-for-Suno export)
+- [x] **v1.0.3** — Fixed a tabs bug: switching tabs while a save was in
+      flight (e.g. right after the save dialog) could save to the wrong
+      tab — the tab you meant to save would keep showing as unsaved,
+      and a different tab would pick up the saved file's name without
+      its content actually changing
 
 ## Building from source
 
