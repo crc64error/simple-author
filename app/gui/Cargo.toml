@@ -10,3 +10,4 @@ description = "Simple Author — a distraction-free book writing editor."
 simple-writer-core = { path = "../core" }
 eframe = "0.32"
 egui = "0.32"
+rfd = "0.15"
