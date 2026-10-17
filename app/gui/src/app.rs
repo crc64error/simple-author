@@ -162,16 +162,21 @@ impl eframe::App for EditorApp {
                     egui::vec2(width, ui.available_height()),
                     egui::Layout::top_down(egui::Align::Min),
                     |ui| {
-                        let output = egui::TextEdit::multiline(&mut self.doc)
-                            .font(egui::FontId::proportional(EDITOR_FONT_SIZE))
-                            .frame(false)
-                            .desired_width(width)
-                            .desired_rows(10)
-                            .show(ui);
+                        egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
+                            let output = egui::TextEdit::multiline(&mut self.doc)
+                                .font(egui::FontId::proportional(EDITOR_FONT_SIZE))
+                                .frame(false)
+                                .desired_width(width)
+                                // Let the widget grow to fit the document rather than
+                                // clamping rows — the ScrollArea around it is what
+                                // handles anything taller than the viewport.
+                                .desired_rows(1)
+                                .show(ui);
 
-                        if let Some(range) = output.cursor_range {
-                            self.cursor_byte = char_index_to_byte_offset(&self.doc, range.primary.index);
-                        }
+                            if let Some(range) = output.cursor_range {
+                                self.cursor_byte = char_index_to_byte_offset(&self.doc, range.primary.index);
+                            }
+                        });
                     },
                 );
             });
