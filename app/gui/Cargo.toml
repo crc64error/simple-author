@@ -1,0 +1,12 @@
+[package]
+name = "simple-writer"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Simple Author — a distraction-free book writing editor."
+
+[dependencies]
+simple-writer-core = { path = "../core" }
+eframe = "0.32"
+egui = "0.32"
