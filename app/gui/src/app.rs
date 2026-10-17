@@ -1,16 +1,25 @@
-//! Phase 3: a minimal single-document editing MVP. No tabs, no decorations,
-//! no native menu yet (those are later phases) — this just proves out the
-//! real editing loop: typing, Open/Save/Save As via native dialogs, and the
-//! core crate's word/outline stats wired to the live cursor position.
+//! Phase 3 (editing MVP) + phase 4 (decorations). No tabs, no native menu,
+//! no outline sidebar, no invisibles/rendered-mode/syllable-gutter yet
+//! (those need the overlay-painting approach described in the rewrite plan,
+//! not just `layouter` ranges) — this proves out headings/notes/italics/
+//! spellcheck/scripture/Suno styling and the 4 themes.
 
+use crate::decorate::build_layout_job;
 use crate::file_ops;
-use simple_writer_core::modes::{compute_stats, get_mode, MODES, WritingModeId};
+use crate::theme::{self, ThemeId};
+use simple_writer_core::decorations::{compute_spans, DecorationOptions};
+use simple_writer_core::modes::{compute_stats, get_mode, WritingModeId, MODES};
+use simple_writer_core::spellcheck::Spellchecker;
 use std::path::PathBuf;
 
 /// The editor column is a fixed reading width, centered, regardless of
 /// window size — mirrors `themes.ts`'s `editorTheme()` (`max-width: 720px`).
 const EDITOR_COLUMN_WIDTH: f32 = 720.0;
 const EDITOR_FONT_SIZE: f32 = 20.0;
+
+const EN_AFF: &str = include_str!("../../core/assets/dicts/en.aff");
+const EN_DIC: &str = include_str!("../../core/assets/dicts/en.dic");
+const PT_DIC: &str = include_str!("../../core/assets/dicts/pt.dic");
 
 enum PendingAction {
     New,
@@ -25,18 +34,23 @@ pub struct EditorApp {
     saved_content: Option<String>,
     cursor_byte: usize,
     mode: WritingModeId,
+    theme_id: ThemeId,
     pending_action: Option<PendingAction>,
+    spellchecker: Spellchecker,
 }
 
 impl Default for EditorApp {
     fn default() -> Self {
+        let english = Spellchecker::load_english(EN_AFF, EN_DIC);
         Self {
             doc: get_mode(WritingModeId::Book).blank_document.to_string(),
             file_path: None,
             saved_content: None,
             cursor_byte: 0,
             mode: WritingModeId::Book,
+            theme_id: ThemeId::Forest,
             pending_action: None,
+            spellchecker: Spellchecker::new(english, PT_DIC),
         }
     }
 }
@@ -83,7 +97,7 @@ impl EditorApp {
     /// Runs `action` immediately if the document isn't dirty; otherwise
     /// queues it behind a confirmation modal. Mirrors the TS tab-close
     /// confirm, simplified for the single-document MVP (full per-tab
-    /// confirmation returns in phase 4).
+    /// confirmation returns in the tabs phase).
     fn guarded(&mut self, action: PendingAction) {
         if self.is_dirty() {
             self.pending_action = Some(action);
@@ -98,10 +112,21 @@ impl EditorApp {
             PendingAction::Open => self.do_open(),
         }
     }
+
+    fn spell_errors(&self) -> Vec<(usize, usize)> {
+        let skip = simple_writer_core::decorations::spellcheck_skip_ranges(&self.doc);
+        self.spellchecker
+            .find_misspellings(&self.doc)
+            .filter(|&(start, end)| !skip.iter().any(|&(s, e)| start >= s && end <= e))
+            .collect()
+    }
 }
 
 impl eframe::App for EditorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let theme = theme::get(self.theme_id);
+        apply_theme_visuals(ctx, theme);
+
         // Cheap to call every frame; eframe/winit only actually touches the
         // native title bar when the string changes.
         let title = file_ops::window_title(self.file_path.as_deref());
@@ -129,6 +154,14 @@ impl eframe::App for EditorApp {
                     .show_ui(ui, |ui| {
                         for m in &MODES {
                             ui.selectable_value(&mut self.mode, m.id, m.label);
+                        }
+                    });
+
+                egui::ComboBox::from_id_salt("theme")
+                    .selected_text(theme.label)
+                    .show_ui(ui, |ui| {
+                        for t in &theme::THEMES {
+                            ui.selectable_value(&mut self.theme_id, t.id, t.label);
                         }
                     });
 
@@ -163,14 +196,28 @@ impl eframe::App for EditorApp {
                     egui::Layout::top_down(egui::Align::Min),
                     |ui| {
                         egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
+                            let spell_errors = self.spell_errors();
+                            let decoration_options = DecorationOptions {
+                                scripture_highlight: get_mode(self.mode).scripture_highlight,
+                                lyrics_mode: self.mode == WritingModeId::Lyrics,
+                            };
+
+                            let mut layouter = |ui: &egui::Ui, buf: &dyn egui::TextBuffer, wrap_width: f32| {
+                                let text = buf.as_str();
+                                let spans = compute_spans(text, decoration_options);
+                                let mut job = build_layout_job(text, theme, EDITOR_FONT_SIZE, &spans, &spell_errors);
+                                job.wrap.max_width = wrap_width;
+                                ui.fonts(|f| f.layout_job(job))
+                            };
+
                             let output = egui::TextEdit::multiline(&mut self.doc)
-                                .font(egui::FontId::proportional(EDITOR_FONT_SIZE))
                                 .frame(false)
                                 .desired_width(width)
                                 // Let the widget grow to fit the document rather than
                                 // clamping rows — the ScrollArea around it is what
                                 // handles anything taller than the viewport.
                                 .desired_rows(1)
+                                .layouter(&mut layouter)
                                 .show(ui);
 
                             if let Some(range) = output.cursor_range {
@@ -209,6 +256,19 @@ impl eframe::App for EditorApp {
             }
         }
     }
+}
+
+fn apply_theme_visuals(ctx: &egui::Context, theme: &theme::Theme) {
+    let mut visuals = if theme.id == ThemeId::Parchment {
+        egui::Visuals::light()
+    } else {
+        egui::Visuals::dark()
+    };
+    visuals.panel_fill = theme.bg;
+    visuals.window_fill = theme.bg;
+    visuals.override_text_color = Some(theme.fg);
+    visuals.selection.bg_fill = theme.selection;
+    ctx.set_visuals(visuals);
 }
 
 /// egui's cursor is a character index; our core crate's APIs take byte

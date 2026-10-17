@@ -1,5 +1,7 @@
 mod app;
+mod decorate;
 mod file_ops;
+mod theme;
 
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {

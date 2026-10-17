@@ -3,6 +3,7 @@
 //! rewrite plan for the full functional spec this crate is held to).
 
 mod block_scan;
+pub mod decorations;
 pub mod document;
 pub mod export;
 pub mod modes;
