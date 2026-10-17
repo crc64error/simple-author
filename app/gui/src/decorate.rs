@@ -71,6 +71,7 @@ fn resolve_format(theme: &Theme, base_size: f32, covering: &[&Span], misspelled:
         SpanKind::EmphasisText,
         SpanKind::EmphasisMarker,
         SpanKind::PerformanceTag,
+        SpanKind::NoteBody,
     ] {
         if covering.iter().any(|s| s.kind == kind) {
             match kind {
@@ -96,6 +97,7 @@ fn resolve_format(theme: &Theme, base_size: f32, covering: &[&Span], misspelled:
                     color = theme.accent;
                     italics = true;
                 }
+                SpanKind::NoteBody => color = theme.notes_text,
                 _ => {}
             }
             break 'fg;

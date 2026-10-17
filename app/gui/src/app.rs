@@ -125,7 +125,7 @@ impl EditorApp {
 impl eframe::App for EditorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let theme = theme::get(self.theme_id);
-        apply_theme_visuals(ctx, theme);
+        apply_theme_visuals(ctx, &theme);
 
         // Cheap to call every frame; eframe/winit only actually touches the
         // native title bar when the string changes.
@@ -160,7 +160,7 @@ impl eframe::App for EditorApp {
                 egui::ComboBox::from_id_salt("theme")
                     .selected_text(theme.label)
                     .show_ui(ui, |ui| {
-                        for t in &theme::THEMES {
+                        for t in theme::themes() {
                             ui.selectable_value(&mut self.theme_id, t.id, t.label);
                         }
                     });
@@ -205,7 +205,7 @@ impl eframe::App for EditorApp {
                             let mut layouter = |ui: &egui::Ui, buf: &dyn egui::TextBuffer, wrap_width: f32| {
                                 let text = buf.as_str();
                                 let spans = compute_spans(text, decoration_options);
-                                let mut job = build_layout_job(text, theme, EDITOR_FONT_SIZE, &spans, &spell_errors);
+                                let mut job = build_layout_job(text, &theme, EDITOR_FONT_SIZE, &spans, &spell_errors);
                                 job.wrap.max_width = wrap_width;
                                 ui.fonts(|f| f.layout_job(job))
                             };
