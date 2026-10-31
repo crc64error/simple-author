@@ -36,31 +36,31 @@ export function initThesaurus(): Promise<void> {
   return loadPromise;
 }
 
-async function load(): Promise<void> {
+async function fetchThesaurus(): Promise<string> {
   const response = await fetch('./dicts/th_en_US_v2.dat');
-  if (!response.ok) {
-    throw new Error(`Thesaurus fetch failed (${response.status})`);
-  }
-  data = await response.text();
+  if (!response.ok) throw new Error(`Thesaurus fetch failed (${response.status})`);
+  return response.text();
+}
 
-  const idx = new Map<string, number>();
+function scanThesaurus(text: string, keepOffsets: boolean): { parts: Map<string, number>; offsets: Map<string, number> } {
+  const offsets = new Map<string, number>();
   const parts = new Map<string, number>();
-  let pos = data.indexOf('\n') + 1;
-  while (pos > 0 && pos < data.length) {
-    const lineEnd = data.indexOf('\n', pos);
-    const line = lineEnd === -1 ? data.slice(pos) : data.slice(pos, lineEnd);
+  let pos = text.indexOf('\n') + 1;
+  while (pos > 0 && pos < text.length) {
+    const lineEnd = text.indexOf('\n', pos);
+    const line = lineEnd === -1 ? text.slice(pos) : text.slice(pos, lineEnd);
     const bar = line.indexOf('|');
     if (bar === -1) break;
     const head = line.slice(0, bar);
-    idx.set(head, pos);
+    if (keepOffsets) offsets.set(head, pos);
 
     const meanings = Number(line.slice(bar + 1));
     if (!Number.isFinite(meanings) || lineEnd === -1) break;
     pos = lineEnd + 1;
     let bits = 0;
-    for (let i = 0; i < meanings && pos > 0 && pos < data.length; i++) {
-      const meaningEnd = data.indexOf('\n', pos);
-      const meaning = meaningEnd === -1 ? data.slice(pos) : data.slice(pos, meaningEnd);
+    for (let i = 0; i < meanings && pos > 0 && pos < text.length; i++) {
+      const meaningEnd = text.indexOf('\n', pos);
+      const meaning = meaningEnd === -1 ? text.slice(pos) : text.slice(pos, meaningEnd);
       const pipe = meaning.indexOf('|');
       const label = (pipe === -1 ? meaning : meaning.slice(0, pipe)).toLowerCase();
       if (label.includes('noun')) bits |= POS.noun;
@@ -75,8 +75,20 @@ async function load(): Promise<void> {
     }
     if (bits) parts.set(head, bits);
   }
-  index = idx;
-  posIndex = parts;
+  return { parts, offsets };
+}
+
+async function load(): Promise<void> {
+  // Keep the part-of-speech map and drop the 18MB source. Synonym lookup
+  // reads the file again the first time a word is right-clicked.
+  const scanned = scanThesaurus(await fetchThesaurus(), false);
+  posIndex = scanned.parts;
+}
+
+async function ensureSynonyms(): Promise<void> {
+  if (data && index) return;
+  data = await fetchThesaurus();
+  index = scanThesaurus(data, true).offsets;
 }
 
 export interface ThesaurusResult {
@@ -131,6 +143,12 @@ export function hasPos(word: string, bit: number): boolean {
 
 export async function lookupSynonyms(word: string): Promise<ThesaurusResult | null> {
   await initThesaurus();
+  try {
+    await ensureSynonyms();
+  } catch (error) {
+    console.error('Simple Author: thesaurus failed to load.', error);
+    return null;
+  }
   if (!index || !data) return null;
 
   let headword = '';

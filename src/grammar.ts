@@ -1,15 +1,13 @@
 // Light fiction checks. Each rule is a soft underline the writer can turn off.
 // Nothing here rewrites the manuscript — a hint, not a correction.
 
-import { StateEffect, Transaction } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
+import { analysisEffect, analysisSnapshot, scheduleAnalysis } from './analysis';
 import { findBookBlocks, readLexicon, type Lexicon } from './lexicon';
 import { findNoteBlocks } from './notes';
 import { WORD_REGEX_SOURCE, gapEndsSentence } from './prose';
 import { findStyleBlocks } from './suno';
 import { POS, hasPos, lookupPos, thesaurusReady } from './thesaurus';
-
-export const grammarRefreshEffect = StateEffect.define<void>();
 
 export type GrammarRuleId =
   | 'repeat'
@@ -347,6 +345,12 @@ function checkEcho(doc: string, lex: Lexicon, issues: GrammarIssue[]): void {
   const sentences = splitSentences(doc);
   const recent: { word: string; index: number }[] = [];
   sentences.forEach((sentence, index) => {
+    const oldest = index - 2;
+    if (recent.length && recent[0].index < oldest) {
+      let drop = 0;
+      while (drop < recent.length && recent[drop].index < oldest) drop++;
+      recent.splice(0, drop);
+    }
     const text = doc.slice(sentence.from, sentence.to);
     const flagged = new Set<string>();
     for (const match of text.matchAll(WORD_PATTERN)) {
@@ -357,7 +361,7 @@ function checkEcho(doc: string, lex: Lexicon, issues: GrammarIssue[]): void {
       // Capitalized words are usually names. Skipping them keeps the hint off
       // character names, which repeat in every sentence on purpose.
       if (/^[A-ZÀ-Ý]/.test(original) || /[A-ZÀ-Ý]/.test(original.slice(1))) continue;
-      const earlier = recent.find((entry) => entry.word === lower && index - entry.index <= 2 && index !== entry.index);
+      const earlier = recent.find((entry) => entry.word === lower && entry.index !== index);
       if (earlier && !flagged.has(lower)) {
         flagged.add(lower);
         const from = sentence.from + match.index;
@@ -468,9 +472,16 @@ function checkSaidBookism(doc: string, issues: GrammarIssue[]): void {
 }
 
 export function findGrammarIssues(doc: string, active: GrammarSettings = grammarSettings()): GrammarIssue[] {
+  return findGrammarIssuesFor(doc, readLexicon(doc), active);
+}
+
+export function findGrammarIssuesFor(
+  doc: string,
+  lex: Lexicon,
+  active: GrammarSettings = grammarSettings(),
+): GrammarIssue[] {
   if (!active.enabled) return [];
   const masked = maskPrivate(doc);
-  const lex = readLexicon(doc);
   const issues: GrammarIssue[] = [];
   const on = (id: GrammarRuleId) => active.enabled && active.rules[id] !== false;
   if (on('repeat')) checkRepeats(masked, issues);
@@ -485,6 +496,10 @@ export function findGrammarIssues(doc: string, active: GrammarSettings = grammar
 }
 
 let latestIssues: GrammarIssue[] = [];
+
+export function setLatestGrammarIssues(issues: GrammarIssue[]): void {
+  latestIssues = issues;
+}
 
 export function grammarIssuesAt(pos: number): GrammarIssue[] {
   return latestIssues.filter((issue) => pos >= issue.from && pos <= issue.to);
@@ -501,61 +516,43 @@ function hintMark(message: string): Decoration {
   return mark;
 }
 
-const DEBOUNCE_MS = 250;
-
 export const grammarPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
-    private timer: ReturnType<typeof setTimeout> | undefined;
-    private view: EditorView;
 
     constructor(view: EditorView) {
-      this.view = view;
       this.decorations = this.build(view);
+      scheduleAnalysis(view);
     }
 
     update(update: ViewUpdate) {
-      this.view = update.view;
+      // Viewport changes must not re-scan. The cached marks are already in
+      // the document, and CodeMirror maps them while the writer scrolls.
+      if (update.docChanged) scheduleAnalysis(update.view);
       const refresh = update.transactions.some((tr) =>
-        tr.effects.some((effect) => effect.is(grammarRefreshEffect)),
+        tr.effects.some((effect) => effect.is(analysisEffect)),
       );
-      if (refresh || update.viewportChanged) {
-        this.decorations = this.build(update.view);
-        return;
-      }
-      if (update.docChanged) {
-        clearTimeout(this.timer);
-        this.timer = setTimeout(() => {
-          this.view.dispatch({
-            effects: grammarRefreshEffect.of(),
-            annotations: Transaction.addToHistory.of(false),
-          });
-        }, DEBOUNCE_MS);
-      }
-    }
-
-    destroy() {
-      clearTimeout(this.timer);
+      if (refresh) this.decorations = this.build(update.view);
     }
 
     private build(view: EditorView): DecorationSet {
-      const doc = view.state.doc.toString();
-      latestIssues = findGrammarIssues(doc);
-      if (latestIssues.length === 0) return Decoration.none;
-      const visible = view.visibleRanges;
+      const max = view.state.doc.length;
       const ranges = [];
-      for (const issue of latestIssues) {
-        if (!visible.some((range) => issue.to >= range.from && issue.from <= range.to)) continue;
-        ranges.push(hintMark(issue.message).range(issue.from, issue.to));
+      for (const chapter of analysisSnapshot().chapters) {
+        for (const issue of chapter.grammar) {
+          if (issue.from < issue.to && issue.to <= max) {
+            ranges.push(hintMark(issue.message).range(issue.from, issue.to));
+          }
+        }
       }
-      return ranges.length ? Decoration.set(ranges) : Decoration.none;
+      return ranges.length ? Decoration.set(ranges, true) : Decoration.none;
     }
   },
   { decorations: (value) => value.decorations },
 );
 
 export function refreshGrammar(view: EditorView): void {
-  view.dispatch({ effects: grammarRefreshEffect.of() });
+  scheduleAnalysis(view);
 }
 
 export function mountGrammarMenu(button: HTMLButtonElement, getView: () => EditorView): void {

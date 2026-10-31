@@ -13,9 +13,10 @@ import { createTabs, type TabsApi } from './tabs';
 import { createPublishingModal } from './publishing-guide';
 import { createOutline } from './outline';
 import { createReminders } from './reminders';
-import { initSpellcheck, refreshSpellcheck } from './spellcheck';
+import { setAnalysisDocumentKey, setAnalysisProgress } from './analysis';
+import { initSpellcheck } from './spellcheck';
 import { setupFindBar } from './findbar';
-import { mountGrammarMenu, refreshGrammar } from './grammar';
+import { mountGrammarMenu } from './grammar';
 import { setupContextMenu } from './context-menu';
 import { initThesaurus } from './thesaurus';
 import { initPhonetics } from './phonetics';
@@ -117,6 +118,23 @@ const editor = createEditor(
   updateUI,
   () => tabsApi?.draftKey() ?? 'simple-writer-draft',
 );
+
+const analysisProgressEl = document.getElementById('analysis-progress')!;
+const analysisProgressLabel = document.getElementById('analysis-progress-label')!;
+const analysisProgressBar = document.getElementById('analysis-progress-bar') as HTMLElement;
+setAnalysisDocumentKey(() => tabsApi?.draftKey() ?? 'simple-writer-draft');
+setAnalysisProgress((progress) => {
+  if (!progress) {
+    analysisProgressEl.hidden = true;
+    return;
+  }
+  analysisProgressEl.hidden = false;
+  analysisProgressLabel.textContent = progress.label;
+  const pct = Math.round(Math.max(0, Math.min(1, progress.ratio)) * 100);
+  analysisProgressBar.style.width = `${pct}%`;
+  analysisProgressEl.setAttribute('aria-valuenow', String(pct));
+  analysisProgressEl.setAttribute('aria-valuetext', progress.label);
+});
 
 scrollToPosition = (pos) => editor.scrollTo(pos);
 editor.setShowNotes(showNotes);
@@ -381,16 +399,14 @@ fileInput.addEventListener('change', async () => {
 
 const findBar = setupFindBar(editor.view, editorContainer);
 
-initSpellcheck().then(() => {
-  refreshSpellcheck(editor.view);
-});
+// Dictionaries start loading now. The analysis pass waits for them, then
+// reads the on-disk cache, so this startup must not throw that cache away.
+void initSpellcheck();
 
 setupContextMenu(editor.view, {
   showRhymes: () => currentMode.id === 'poetry' || currentMode.id === 'lyrics',
 });
-void initThesaurus().then(() => {
-  refreshGrammar(editor.view);
-});
+void initThesaurus();
 void initPhonetics().then(() => {
   // Correct any heuristic syllable counts rendered before the dictionary loaded.
   editor.view.dispatch({ effects: syllablesRefreshEffect.of() });

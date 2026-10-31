@@ -634,6 +634,37 @@ body.modal-open {
   flex: 1;
 }
 
+.analysis-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 14rem;
+  max-width: 22rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.analysis-progress[hidden] {
+  display: none;
+}
+
+.analysis-progress-track {
+  flex: 1;
+  height: 0.35rem;
+  min-width: 4.5rem;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.analysis-progress-bar {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 999px;
+}
+
 .status-hint {
   color: var(--text-muted);
   font-style: italic;

@@ -1,25 +1,19 @@
-import { StateEffect, Transaction } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
 import NSpell from 'nspell';
-import { findBookBlocks, isBookWord, isLineInBook, lookupName, readLexicon, type Lexicon } from './lexicon';
-import { findNoteBlocks, isLineInNotes } from './notes';
-import {
-  WORD_REGEX_SOURCE,
-  isSentenceStart,
-  lineOpensSentence,
-  straightenApostrophes,
-  wordsInLine,
-} from './prose';
+import { analysisEffect, analysisSnapshot, invalidateSpellingReuse, scheduleAnalysis } from './analysis';
+import { deleteWordVerdict, readWordVerdicts, writeWordVerdicts } from './analysis-cache';
+import { isBookWord, lookupName, readLexicon, type Lexicon } from './lexicon';
+import { WORD_REGEX_SOURCE, isSentenceStart, straightenApostrophes } from './prose';
 
 export { WORD_REGEX_SOURCE };
-
-export const spellcheckReadyEffect = StateEffect.define<void>();
 
 let spellEn: NSpell | null = null;
 let ptWords: Set<string> | null = null;
 let spellEnReady = false;
+let spellPromise: Promise<void> | null = null;
+const verdicts = new Map<string, boolean>();
+const dirtyVerdicts: [string, boolean][] = [];
 
-const DEBOUNCE_MS = 200;
 const USER_DICT_KEY = 'simple-writer-user-dict';
 
 // The pronoun and its contractions are stored capitalized in the dictionary,
@@ -53,20 +47,35 @@ function saveUserDict(): void {
 }
 
 export function addToUserDictionary(word: string): void {
-  userWords.add(straightenApostrophes(word).toLowerCase());
+  const key = straightenApostrophes(word).toLowerCase();
+  userWords.add(key);
   saveUserDict();
+  forgetSpelling(key);
 }
 
 export function removeFromUserDictionary(word: string): void {
-  userWords.delete(straightenApostrophes(word).toLowerCase());
+  const key = straightenApostrophes(word).toLowerCase();
+  userWords.delete(key);
   saveUserDict();
+  forgetSpelling(key);
+}
+
+export function forgetSpelling(word: string): void {
+  const key = straightenApostrophes(word).toLowerCase();
+  verdicts.delete(key);
+  void deleteWordVerdict(key);
 }
 
 export function isInUserDictionary(word: string): boolean {
   return userWords.has(straightenApostrophes(word).toLowerCase());
 }
 
-export async function initSpellcheck(): Promise<void> {
+export function initSpellcheck(): Promise<void> {
+  if (!spellPromise) spellPromise = loadSpellcheck();
+  return spellPromise;
+}
+
+async function loadSpellcheck(): Promise<void> {
   try {
     const [enAff, enDic] = await Promise.all([fetchDict('en.aff'), fetchDict('en.dic')]);
     spellEn = new NSpell(enAff, enDic);
@@ -80,6 +89,23 @@ export async function initSpellcheck(): Promise<void> {
   } catch (error) {
     console.error('Simple Author: Portuguese word list failed to load.', error);
   }
+}
+
+export function spellReady(): boolean {
+  return spellEnReady;
+}
+
+export async function loadSpellingCache(): Promise<void> {
+  const stored = await readWordVerdicts();
+  for (const [word, ok] of stored) {
+    if (!verdicts.has(word)) verdicts.set(word, ok);
+  }
+}
+
+export async function flushSpellingCache(): Promise<void> {
+  if (dirtyVerdicts.length === 0) return;
+  const batch = dirtyVerdicts.splice(0);
+  await writeWordVerdicts(batch);
 }
 
 async function fetchDict(filename: string): Promise<string> {
@@ -186,14 +212,37 @@ export function classifyWord(
   return { kind: 'ok', suggestions: [] };
 }
 
+function rememberVerdict(straight: string): boolean {
+  const key = straightenApostrophes(straight).toLowerCase();
+  const hit = verdicts.get(key);
+  if (hit !== undefined) return hit;
+  const ok = inSpellingDictionary(straight);
+  verdicts.set(key, ok);
+  dirtyVerdicts.push([key, ok]);
+  return ok;
+}
+
 function liveDict(): SpellDict {
   return {
     spelledOk(straight, lexicon) {
       if (!spellEnReady || !spellEn) return true;
       if (isBookWord(lexicon, straight)) return true;
-      return inSpellingDictionary(straight);
+      return rememberVerdict(straight);
     },
     suggest: dictionarySuggestions,
+  };
+}
+
+// Document scans ask only whether a word is known. Suggestions stay on the
+// right-click path, because hunspell's suggestion search is the slow part.
+export function spellScanDict(): SpellDict {
+  return {
+    spelledOk(straight, lexicon) {
+      if (!spellEnReady || !spellEn) return true;
+      if (isBookWord(lexicon, straight)) return true;
+      return rememberVerdict(straight);
+    },
+    suggest: () => [],
   };
 }
 
@@ -223,93 +272,34 @@ const misspelledMark = Decoration.mark({
   class: 'cm-spell-error',
 });
 
-function checkLine(
-  doc: string,
-  lineFrom: number,
-  text: string,
-  lexicon: Lexicon,
-  decorations: { from: number; to: number; value: Decoration }[],
-): void {
-  const dict = liveDict();
-  const spans = wordsInLine(text, lineOpensSentence(doc, lineFrom));
-  for (const span of spans) {
-    const advice = classifyWord(span.word, span.sentenceStart, lexicon, dict);
-    if (advice.kind === 'ok') continue;
-    decorations.push({
-      from: lineFrom + span.from,
-      to: lineFrom + span.to,
-      value: misspelledMark,
-    });
-  }
-}
-
-function buildDecorations(view: EditorView): DecorationSet {
-  if (!spellEnReady) return Decoration.none;
-
-  const decorations: { from: number; to: number; value: Decoration }[] = [];
-  const docText = view.state.doc.toString();
-  const noteBlocks = findNoteBlocks(docText);
-  const bookBlocks = findBookBlocks(docText);
-  const lexicon = readLexicon(docText);
-  const doc = view.state.doc;
-
-  for (const { from, to } of view.visibleRanges) {
-    let pos = from;
-    while (pos <= to) {
-      const line = doc.lineAt(pos);
-      const text = line.text;
-
-      if (
-        !isLineInNotes(noteBlocks, line.from) &&
-        !isLineInBook(bookBlocks, line.from) &&
-        !/^#{1,3}\s/.test(text)
-      ) {
-        checkLine(docText, line.from, text, lexicon, decorations);
-      }
-
-      if (line.number >= doc.lines) break;
-      pos = line.to + 1;
+function marksFromCache(view: EditorView): DecorationSet {
+  const max = view.state.doc.length;
+  const ranges = [];
+  for (const chapter of analysisSnapshot().chapters) {
+    for (const mark of chapter.spelling) {
+      if (mark.from < mark.to && mark.to <= max) ranges.push(misspelledMark.range(mark.from, mark.to));
     }
   }
-
-  return Decoration.set(decorations.sort((a, b) => a.from - b.from));
+  return ranges.length ? Decoration.set(ranges, true) : Decoration.none;
 }
 
 export const spellcheckPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
-    private timer: ReturnType<typeof setTimeout> | undefined;
-    private view: EditorView;
 
     constructor(view: EditorView) {
-      this.view = view;
-      this.decorations = buildDecorations(view);
+      this.decorations = marksFromCache(view);
+      scheduleAnalysis(view);
     }
 
     update(update: ViewUpdate) {
-      this.view = update.view;
-      const readyNow = update.transactions.some((tr) =>
-        tr.effects.some((e) => e.is(spellcheckReadyEffect)),
+      // Rebuilding marks here made the viewport stay blank until the scan
+      // finished. Scroll paints the cached marks; edits update the cache.
+      if (update.docChanged) scheduleAnalysis(update.view);
+      const refresh = update.transactions.some((tr) =>
+        tr.effects.some((effect) => effect.is(analysisEffect)),
       );
-
-      if (readyNow || update.viewportChanged) {
-        this.decorations = buildDecorations(update.view);
-        return;
-      }
-
-      if (update.docChanged) {
-        clearTimeout(this.timer);
-        this.timer = setTimeout(() => {
-          this.view.dispatch({
-            effects: spellcheckReadyEffect.of(),
-            annotations: Transaction.addToHistory.of(false),
-          });
-        }, DEBOUNCE_MS);
-      }
-    }
-
-    destroy() {
-      clearTimeout(this.timer);
+      if (refresh) this.decorations = marksFromCache(update.view);
     }
   },
   {
@@ -318,6 +308,6 @@ export const spellcheckPlugin = ViewPlugin.fromClass(
 );
 
 export function refreshSpellcheck(view: EditorView): void {
-  if (!spellEnReady) return;
-  view.dispatch({ effects: spellcheckReadyEffect.of() });
+  invalidateSpellingReuse();
+  scheduleAnalysis(view);
 }

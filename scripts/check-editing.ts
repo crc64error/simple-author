@@ -4,6 +4,8 @@ import NSpell from 'nspell';
 import { EditorState } from '@codemirror/state';
 import { history, undo, undoDepth } from '@codemirror/commands';
 import { linePrefixEdit, wrapEdit } from '../src/editor.ts';
+import { matchCachedChapters } from '../src/analysis-cache.ts';
+import { chapterSlices, hashText, paragraphSlices } from '../src/analysis.ts';
 import { findMatches, replaceAllChanges } from '../src/findbar.ts';
 import { findGrammarIssues, type GrammarSettings } from '../src/grammar.ts';
 import { canonicalName, lexiconChanges, readLexicon } from '../src/lexicon.ts';
@@ -251,6 +253,48 @@ function advice(word: string, sentenceStart: boolean, lex = emptyLexicon()) {
 
   const names = findGrammarIssues('Elara smiled.\nElara waved.', allOn);
   assert.equal(names.some((issue) => issue.rule === 'echo'), false);
+}
+
+// --- cached analysis is reused by text hash ---
+{
+  const cached = [{ hash: 'a' }, { hash: 'b' }, { hash: 'c' }];
+  const ids = (hashes: string[]) => matchCachedChapters(hashes, cached).map((item) => item?.hash ?? null);
+  assert.deepEqual(ids(['a', 'b', 'c']), ['a', 'b', 'c']);
+  assert.deepEqual(ids(['a', 'edited', 'c']), ['a', null, 'c']);
+  assert.deepEqual(ids(['inserted', 'a', 'b', 'c']), [null, 'a', 'b', 'c']);
+  assert.deepEqual(ids(['a', 'c']), ['a', 'c']);
+
+  const doc = [
+    '# One',
+    '',
+    'Alpha stays.',
+    '',
+    'Beta changes.',
+    '',
+    'Gamma stays.',
+    '',
+    '## Two',
+    '',
+    'Other chapter stays.',
+  ].join('\n');
+  const edited = doc.replace('Beta changes.', 'Beta changed.');
+  const beforeChapters = chapterSlices(doc);
+  const afterChapters = chapterSlices(edited);
+  const chapterAligned = matchCachedChapters(
+    afterChapters.map((chapter) => hashText(chapter.text)),
+    beforeChapters.map((chapter) => ({ hash: hashText(chapter.text) })),
+  );
+  assert.equal(chapterAligned[0], null);
+  assert.equal(chapterAligned[1]?.hash, hashText(beforeChapters[1].text));
+
+  const beforeParas = paragraphSlices(beforeChapters[0].text);
+  const afterParas = paragraphSlices(afterChapters[0].text);
+  const aligned = matchCachedChapters(
+    afterParas.map((paragraph) => hashText(paragraph.text)),
+    beforeParas.map((paragraph) => ({ hash: hashText(paragraph.text) })),
+  );
+  assert.equal(aligned.filter((paragraph) => paragraph === null).length, 1);
+  assert.ok(aligned.filter((paragraph) => paragraph !== null).length >= 2);
 }
 
 console.log('editing checks passed');
