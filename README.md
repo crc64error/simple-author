@@ -133,6 +133,10 @@ Goals get checked off as they ship. Ideas and votes welcome in the
       tab — the tab you meant to save would keep showing as unsaved,
       and a different tab would pick up the saved file's name without
       its content actually changing
+- [x] **v1.1.0 (beta)** — Find and replace, proper names kept on the
+      book, contraction and capitalization checks, and optional fiction
+      grammar hints. Published as a pre-release; v1.0.1 stays the
+      latest stable build
 
 ## Building from source
 
