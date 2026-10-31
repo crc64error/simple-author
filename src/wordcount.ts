@@ -15,7 +15,12 @@ export interface OutlineSection {
   chapters: OutlineChapter[];
 }
 
+import { stripBookBlocks } from './lexicon';
 import { stripNotes } from './notes';
+
+function stripPrivate(text: string): string {
+  return stripBookBlocks(stripNotes(text));
+}
 
 export interface WordCountSnapshot {
   chapterWords: number;
@@ -45,11 +50,11 @@ export function countWords(text: string): number {
 
 // Verse/poem lines: content lines only — headings, blanks, and notes don't count.
 export function countLines(text: string): number {
-  return contentLines(stripNotes(text)).filter((line) => line !== '').length;
+  return contentLines(stripPrivate(text)).filter((line) => line !== '').length;
 }
 
 export function countStanzas(text: string): number {
-  const lines = contentLines(stripNotes(text));
+  const lines = contentLines(stripPrivate(text));
   let stanzas = 0;
   let inStanza = false;
   for (const line of lines) {
@@ -204,7 +209,7 @@ export function regionTextsAt(
 }
 
 export function computeWordCounts(doc: string, cursorPos: number): WordCountSnapshot {
-  const bookWords = countWords(stripNotes(doc));
+  const bookWords = countWords(stripPrivate(doc));
   const { sections, chapters } = findRegions(doc);
 
   const section = regionAtCursor(sections, cursorPos);
@@ -218,8 +223,8 @@ export function computeWordCounts(doc: string, cursorPos: number): WordCountSnap
       : doc;
 
   return {
-    chapterWords: countWords(stripNotes(chapterText)),
-    sectionWords: countWords(stripNotes(sectionText)),
+    chapterWords: countWords(stripPrivate(chapterText)),
+    sectionWords: countWords(stripPrivate(sectionText)),
     bookWords,
     chapterTitle: chapter?.title ?? '—',
     sectionTitle: section?.title ?? '—',

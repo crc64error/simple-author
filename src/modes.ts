@@ -13,6 +13,7 @@ import {
   stanzaLinesAt,
   countStanzas,
 } from './wordcount';
+import { stripBookBlocks } from './lexicon';
 import { stripNotes } from './notes';
 import { stripStyleBlocks } from './suno';
 
@@ -49,7 +50,7 @@ function n(value: number): string {
   return value.toLocaleString();
 }
 
-const words = (text: string) => countWords(stripNotes(text));
+const words = (text: string) => countWords(stripBookBlocks(stripNotes(text)));
 
 export const MODES: WritingMode[] = [
   {

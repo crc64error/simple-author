@@ -3,6 +3,7 @@
 
 import { StateEffect, StateField, type Range } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from '@codemirror/view';
+import { stripBookBlocks } from './lexicon';
 import { findNoteBlocks, isLineInNotes, stripNotes } from './notes';
 
 export const STYLE_OPEN = '[Style]';
@@ -82,7 +83,7 @@ export function stripStyleBlocks(doc: string): string {
 // Lyrics ready for Suno's lyrics box: style block, notes, and song titles
 // removed; `## Verse 1` headings become Suno's [Verse 1] tags.
 export function buildSunoLyrics(doc: string): string {
-  return stripNotes(stripStyleBlocks(doc))
+  return stripBookBlocks(stripNotes(stripStyleBlocks(doc)))
     .replace(/^# (?!#).*$/gm, '')
     .replace(/^## (?!#)(.+?)\s*$/gm, '[$1]')
     .replace(/\n{3,}/g, '\n\n')
@@ -93,7 +94,7 @@ export function buildSunoLyrics(doc: string): string {
 // [Building vocals, female lead] — but not our block delimiters.
 export function isPerformanceTagLine(trimmed: string): boolean {
   if (!/^\[[^\][]+\]$/.test(trimmed)) return false;
-  return !/^\[\/?(?:Notes|Style)\]$/i.test(trimmed);
+  return !/^\[\/?(?:Notes|Style|Book)\]$/i.test(trimmed);
 }
 
 // --- Editor integration ---

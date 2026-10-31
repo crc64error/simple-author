@@ -1,7 +1,9 @@
-import { Compartment, EditorState } from '@codemirror/state';
+import { Compartment, EditorState, type TransactionSpec } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import { syllableGutter } from './syllable-gutter';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { findBindings, findHighlightPlugin } from './findbar';
+import { grammarPlugin } from './grammar';
 import { invisiblesPlugin, invisiblesStyles, setShowInvisiblesEffect, showInvisiblesField } from './invisibles';
 import { markdownHighlight, markdownStyles, renderedModeField, setRenderedModeEffect } from './markdown';
 import { spellcheckPlugin } from './spellcheck';
@@ -31,6 +33,82 @@ Author notes live in blocks like this one. They stay visible while you write, an
 
 Open your manuscript, or select all and start typing. The story begins here.
 `;
+
+function withTrailingSpace(prefix: string): string {
+  return prefix.endsWith(' ') ? prefix : `${prefix} `;
+}
+
+// Toolbar inserts leave the caret after the inserted text. A heading marker
+// always includes its trailing space (`## `). A selection is prefixed per
+// line, or wrapped, instead of being replaced by the marker.
+export function linePrefixEdit(state: EditorState, prefix: string): TransactionSpec {
+  const spaced = withTrailingSpace(prefix);
+  const sel = state.selection.main;
+  const doc = state.doc;
+
+  if (sel.empty) {
+    const line = doc.lineAt(sel.head);
+    if (line.text.startsWith(spaced)) {
+      const head = sel.head >= line.from + spaced.length ? sel.head - spaced.length : line.from;
+      return {
+        changes: { from: line.from, to: line.from + spaced.length, insert: '' },
+        selection: { anchor: head },
+        userEvent: 'input.insert',
+      };
+    }
+    const existing = /^#{1,3} /.exec(line.text);
+    if (existing) {
+      return {
+        changes: { from: line.from, to: line.from + existing[0].length, insert: spaced },
+        selection: { anchor: line.from + spaced.length },
+        userEvent: 'input.insert',
+      };
+    }
+    return {
+      changes: { from: line.from, insert: spaced },
+      selection: { anchor: line.from + spaced.length },
+      userEvent: 'input.insert',
+    };
+  }
+
+  const startLine = doc.lineAt(sel.from);
+  let endLine = doc.lineAt(sel.to);
+  if (sel.to === endLine.from && endLine.number > startLine.number) {
+    endLine = doc.line(endLine.number - 1);
+  }
+
+  const changes: { from: number; to?: number; insert: string }[] = [];
+  for (let n = startLine.number; n <= endLine.number; n++) {
+    const line = doc.line(n);
+    if (line.text.startsWith(spaced)) continue;
+    const existing = /^#{1,3} /.exec(line.text);
+    if (existing) {
+      changes.push({ from: line.from, to: line.from + existing[0].length, insert: spaced });
+    } else {
+      changes.push({ from: line.from, insert: spaced });
+    }
+  }
+
+  return {
+    changes,
+    selection: { anchor: startLine.from + spaced.length },
+    userEvent: 'input.insert',
+  };
+}
+
+export function wrapEdit(state: EditorState, before: string, after: string): TransactionSpec {
+  const { from, to } = state.selection.main;
+  const selected = state.doc.sliceString(from, to);
+  const insert = `${before}${selected}${after}`;
+  // Nothing selected: caret between the markers, ready to type.
+  // Something selected: wrap it and leave the caret after the closing marker.
+  const anchor = selected.length === 0 ? from + before.length : from + insert.length;
+  return {
+    changes: { from, to, insert },
+    selection: { anchor },
+    userEvent: 'input.insert',
+  };
+}
 
 export interface WriterEditor {
   view: EditorView;
@@ -71,7 +149,9 @@ export function createEditor(
   const extensions = [
     syllableCompartment.of([]),
     history(),
-    keymap.of([...defaultKeymap, ...historyKeymap]),
+    keymap.of([...findBindings, ...defaultKeymap, ...historyKeymap]),
+    findHighlightPlugin,
+    grammarPlugin,
     editorTheme(),
     markdownStyles,
     invisiblesStyles,
@@ -132,34 +212,11 @@ export function createEditor(
       });
     },
     wrapSelection: (before: string, after: string) => {
-      const { from, to } = view.state.selection.main;
-      const selected = view.state.doc.sliceString(from, to);
-      view.dispatch({
-        changes: { from, to, insert: `${before}${selected}${after}` },
-        selection: { anchor: from + before.length, head: from + before.length + selected.length },
-      });
+      view.dispatch(wrapEdit(view.state, before, after));
       view.focus();
     },
     insertLinePrefix: (prefix: string) => {
-      const line = view.state.doc.lineAt(view.state.selection.main.head);
-      const lineText = line.text;
-
-      if (lineText.startsWith(prefix)) {
-        view.dispatch({
-          changes: { from: line.from, to: line.from + prefix.length, insert: '' },
-        });
-      } else {
-        const existing = lineText.match(/^#{1,3}\s/);
-        if (existing) {
-          view.dispatch({
-            changes: { from: line.from, to: line.from + existing[0].length, insert: prefix },
-          });
-        } else {
-          view.dispatch({
-            changes: { from: line.from, insert: prefix },
-          });
-        }
-      }
+      view.dispatch(linePrefixEdit(view.state, prefix));
       view.focus();
     },
     scrollTo: (pos: number) => {
@@ -178,14 +235,18 @@ export function createEditor(
       const prefix = from === 0 || doc.sliceString(from - 1, from) === '\n' ? '' : '\n';
       const suffix = to === doc.length || doc.sliceString(to, to + 1) === '\n' ? '' : '\n';
       if (selected.trim()) {
+        const insert = `${prefix}${NOTE_OPEN}\n${selected}\n${NOTE_CLOSE}${suffix}`;
         view.dispatch({
-          changes: { from, to, insert: `${prefix}${NOTE_OPEN}\n${selected}\n${NOTE_CLOSE}${suffix}` },
+          changes: { from, to, insert },
+          selection: { anchor: from + insert.length },
+          userEvent: 'input.insert',
         });
       } else {
         const block = `${prefix}${NOTE_OPEN}\n\n${NOTE_CLOSE}${suffix}`;
         view.dispatch({
           changes: { from, to, insert: block },
           selection: { anchor: from + prefix.length + NOTE_OPEN.length + 1 },
+          userEvent: 'input.insert',
         });
       }
       view.focus();

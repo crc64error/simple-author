@@ -10,6 +10,7 @@ export interface AppMenuHandlers {
   onToggleMarks: () => void;
   onToggleOutline: () => void;
   onPublishGuide: () => void;
+  onFind: () => void;
 }
 
 export async function setupAppMenu(handlers: AppMenuHandlers): Promise<void> {
@@ -47,6 +48,9 @@ export async function setupAppMenu(handlers: AppMenuHandlers): Promise<void> {
         break;
       case 'publish-guide':
         handlers.onPublishGuide();
+        break;
+      case 'find':
+        handlers.onFind();
         break;
     }
   });
