@@ -45,6 +45,8 @@ fn build_app_menu(app: &tauri::App) -> tauri::Result<()> {
         .close_window()
         .build()?;
 
+    let find_item = MenuItem::with_id(handle, "find", "Find…", true, Some("CmdOrCtrl+F"))?;
+
     let edit_submenu = SubmenuBuilder::new(handle, "Edit")
         .undo()
         .redo()
@@ -52,6 +54,8 @@ fn build_app_menu(app: &tauri::App) -> tauri::Result<()> {
         .cut()
         .copy()
         .paste()
+        .separator()
+        .item(&find_item)
         .separator()
         .select_all()
         .build()?;

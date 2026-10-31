@@ -5,13 +5,26 @@ export interface SynonymGroup {
 
 const MAX_WORDS_PER_GROUP = 12;
 
+export const POS = {
+  noun: 1,
+  verb: 2,
+  adj: 4,
+  adv: 8,
+} as const;
+
 // MyThes th_en_US_v2.dat: encoding line, then repeating blocks of
 // `word|meaningCount` followed by meaningCount lines of `(pos)|syn|syn|…`.
 // Synonyms may carry annotations like "wood (generic term)" for hypernyms
 // or "(antonym)"; only unannotated entries are true synonyms.
+// The same file is the bundled WordNet-derived part-of-speech data.
 let data = '';
 let index: Map<string, number> | null = null;
+let posIndex: Map<string, number> | null = null;
 let loadPromise: Promise<void> | null = null;
+
+export function thesaurusReady(): boolean {
+  return posIndex !== null;
+}
 
 export function initThesaurus(): Promise<void> {
   if (!loadPromise) {
@@ -31,22 +44,39 @@ async function load(): Promise<void> {
   data = await response.text();
 
   const idx = new Map<string, number>();
+  const parts = new Map<string, number>();
   let pos = data.indexOf('\n') + 1;
   while (pos > 0 && pos < data.length) {
     const lineEnd = data.indexOf('\n', pos);
     const line = lineEnd === -1 ? data.slice(pos) : data.slice(pos, lineEnd);
     const bar = line.indexOf('|');
     if (bar === -1) break;
-    idx.set(line.slice(0, bar), pos);
+    const head = line.slice(0, bar);
+    idx.set(head, pos);
 
     const meanings = Number(line.slice(bar + 1));
     if (!Number.isFinite(meanings) || lineEnd === -1) break;
     pos = lineEnd + 1;
-    for (let i = 0; i < meanings && pos > 0; i++) {
-      pos = data.indexOf('\n', pos) + 1;
+    let bits = 0;
+    for (let i = 0; i < meanings && pos > 0 && pos < data.length; i++) {
+      const meaningEnd = data.indexOf('\n', pos);
+      const meaning = meaningEnd === -1 ? data.slice(pos) : data.slice(pos, meaningEnd);
+      const pipe = meaning.indexOf('|');
+      const label = (pipe === -1 ? meaning : meaning.slice(0, pipe)).toLowerCase();
+      if (label.includes('noun')) bits |= POS.noun;
+      else if (label.includes('verb')) bits |= POS.verb;
+      else if (label.includes('adj')) bits |= POS.adj;
+      else if (label.includes('adv')) bits |= POS.adv;
+      if (meaningEnd === -1) {
+        pos = -1;
+        break;
+      }
+      pos = meaningEnd + 1;
     }
+    if (bits) parts.set(head, bits);
   }
   index = idx;
+  posIndex = parts;
 }
 
 export interface ThesaurusResult {
@@ -84,6 +114,19 @@ function cleanSynonym(part: string): string | null {
   if (!part.includes('(')) return part.trim() || null;
   const similar = part.match(/^(.*?)\s*\(similar term\)$/);
   return similar ? similar[1].trim() || null : null;
+}
+
+export function lookupPos(word: string): number {
+  if (!posIndex) return 0;
+  let bits = 0;
+  for (const candidate of lookupCandidates(word.toLowerCase())) {
+    bits |= posIndex.get(candidate) ?? 0;
+  }
+  return bits;
+}
+
+export function hasPos(word: string, bit: number): boolean {
+  return (lookupPos(word) & bit) !== 0;
 }
 
 export async function lookupSynonyms(word: string): Promise<ThesaurusResult | null> {

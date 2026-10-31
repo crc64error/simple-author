@@ -14,6 +14,8 @@ import { createPublishingModal } from './publishing-guide';
 import { createOutline } from './outline';
 import { createReminders } from './reminders';
 import { initSpellcheck, refreshSpellcheck } from './spellcheck';
+import { setupFindBar } from './findbar';
+import { mountGrammarMenu, refreshGrammar } from './grammar';
 import { setupContextMenu } from './context-menu';
 import { initThesaurus } from './thesaurus';
 import { initPhonetics } from './phonetics';
@@ -377,6 +379,8 @@ fileInput.addEventListener('change', async () => {
   fileInput.value = '';
 });
 
+const findBar = setupFindBar(editor.view, editorContainer);
+
 initSpellcheck().then(() => {
   refreshSpellcheck(editor.view);
 });
@@ -384,11 +388,19 @@ initSpellcheck().then(() => {
 setupContextMenu(editor.view, {
   showRhymes: () => currentMode.id === 'poetry' || currentMode.id === 'lyrics',
 });
-void initThesaurus();
+void initThesaurus().then(() => {
+  refreshGrammar(editor.view);
+});
 void initPhonetics().then(() => {
   // Correct any heuristic syllable counts rendered before the dictionary loaded.
   editor.view.dispatch({ effects: syllablesRefreshEffect.of() });
 });
+
+document.getElementById('btn-find')!.addEventListener('click', () => {
+  findBar.open();
+});
+
+mountGrammarMenu(document.getElementById('btn-grammar') as HTMLButtonElement, () => editor.view);
 
 setupAppMenu({
   onNew: () => {
@@ -409,6 +421,9 @@ setupAppMenu({
   onToggleOutline: toggleOutline,
   onPublishGuide: () => {
     publishModal.open();
+  },
+  onFind: () => {
+    findBar.open();
   },
 }).catch((error) => {
   console.error('Failed to set up menu listeners:', error);

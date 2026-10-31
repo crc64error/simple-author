@@ -675,6 +675,157 @@ body.modal-open {
     display: none;
   }
 }
+/* Find and replace */
+.find-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.find-bar[hidden] {
+  display: none;
+}
+
+.find-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.find-input {
+  flex: 1 1 160px;
+  min-width: 120px;
+  padding: 0.32rem 0.55rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.find-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.find-btn {
+  padding: 0.3rem 0.55rem;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.find-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.find-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.find-toggle[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.find-count {
+  min-width: 5.5rem;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.find-close {
+  padding-inline: 0.45rem;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.cm-find-match {
+  background-color: rgba(212, 168, 60, 0.28);
+  border-radius: 2px;
+}
+
+.cm-find-match-current {
+  background-color: rgba(212, 168, 60, 0.55);
+}
+
+.cm-grammar-hint {
+  border-bottom: 1px dotted var(--grammar-hint);
+  padding-bottom: 1px;
+}
+
+/* Grammar checks menu */
+.grammar-menu {
+  position: fixed;
+  z-index: 180;
+  width: min(320px, calc(100vw - 16px));
+  padding: 0.7rem 0.75rem 0.55rem;
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  font-family: var(--font-ui);
+}
+
+.grammar-menu[hidden] {
+  display: none;
+}
+
+.grammar-menu-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.grammar-menu-blurb {
+  margin: 0.25rem 0 0.55rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.grammar-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.28rem 0.15rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.grammar-option strong {
+  display: block;
+  font-weight: 600;
+}
+
+.grammar-option small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.grammar-master {
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.2rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
 /* Editor context menu (spelling + thesaurus) */
 
 .ctx-menu {

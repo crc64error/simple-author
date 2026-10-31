@@ -1,15 +1,26 @@
 import { EditorView } from '@codemirror/view';
 import {
   addToUserDictionary,
+  adviseAt,
   isInUserDictionary,
   isMisspelled,
   refreshSpellcheck,
   removeFromUserDictionary,
-  spellSuggestions,
   WORD_REGEX_SOURCE,
 } from './spellcheck';
 import { lookupSynonyms } from './thesaurus';
 import { lookupRhymes } from './phonetics';
+import {
+  addBookWord,
+  addName,
+  canonicalName,
+  isBookWord,
+  lookupName,
+  readLexicon,
+  removeBookWord,
+  removeName,
+} from './lexicon';
+import { grammarIssuesAt, refreshGrammar, ruleLabel, setGrammarRule } from './grammar';
 
 export interface ContextMenuOptions {
   showRhymes: () => boolean;
@@ -167,37 +178,82 @@ export function setupContextMenu(view: EditorView, options: ContextMenuOptions):
     });
   }
 
-  function buildMenu(hit: WordHit | null): void {
+  function buildMenu(hit: WordHit | null, clickPos: number | null): void {
     menu.replaceChildren();
 
     if (hit) {
-      if (isMisspelled(hit.text)) {
-        const suggestions = spellSuggestions(hit.text);
-        addLabel(menu, 'Spelling');
-        if (suggestions.length === 0) {
-          addLabel(menu, 'No suggestions');
-        }
-        for (const suggestion of suggestions) {
+      const doc = view.state.doc.toString();
+      const lexicon = readLexicon(doc);
+      const advice = adviseAt(doc, hit.from, hit.text);
+      const savedName = lookupName(lexicon, hit.text);
+      const bookWord = isBookWord(lexicon, hit.text);
+
+      if (advice.kind === 'spelling' || advice.kind === 'capital') {
+        addLabel(menu, advice.kind === 'capital' ? 'Capitalization' : 'Spelling');
+        if (advice.suggestions.length === 0) addLabel(menu, 'No suggestions');
+        for (const suggestion of advice.suggestions) {
           addItem(menu, suggestion, () => replaceRange(hit, suggestion));
         }
+      }
+
+      if (advice.kind === 'spelling') {
         addItem(menu, `Add “${hit.text}” to dictionary`, () => {
           addToUserDictionary(hit.text);
           refreshSpellcheck(view);
         });
-        addSeparator(menu);
+        addItem(menu, `Add “${hit.text}” to this book`, () => {
+          addBookWord(view, hit.text);
+        });
       } else if (isInUserDictionary(hit.text)) {
         addItem(menu, `Remove “${hit.text}” from dictionary`, () => {
           removeFromUserDictionary(hit.text);
           refreshSpellcheck(view);
         });
+      }
+
+      if (bookWord) {
+        addItem(menu, `Remove “${hit.text}” from this book`, () => {
+          removeBookWord(view, hit.text);
+        });
+      }
+
+      if (savedName) {
+        addItem(menu, `Remove “${savedName}” from names`, () => {
+          removeName(view, savedName);
+        });
+      } else {
+        const name = canonicalName(hit.text);
+        if (name) {
+          addItem(menu, `Add “${name}” as name`, () => {
+            addName(view, hit.text);
+          });
+        }
+      }
+
+      if (advice.kind !== 'ok' || savedName || bookWord || isInUserDictionary(hit.text)) {
         addSeparator(menu);
       }
+
       buildSynonymSection(hit);
       if (options.showRhymes()) {
         addSeparator(menu);
         buildRhymeSection(hit);
       }
       addSeparator(menu);
+    }
+
+    if (clickPos !== null) {
+      const seen = new Set<string>();
+      for (const issue of grammarIssuesAt(clickPos)) {
+        if (seen.has(issue.rule)) continue;
+        seen.add(issue.rule);
+        addLabel(menu, issue.message);
+        addItem(menu, `Turn off “${ruleLabel(issue.rule)}”`, () => {
+          setGrammarRule(issue.rule, false);
+          refreshGrammar(view);
+        });
+      }
+      if (seen.size > 0) addSeparator(menu);
     }
 
     const { from, to } = view.state.selection.main;
@@ -248,7 +304,7 @@ export function setupContextMenu(view: EditorView, options: ContextMenuOptions):
       }
     }
 
-    buildMenu(hit);
+    buildMenu(hit, pos);
     place(event.clientX, event.clientY);
   });
 

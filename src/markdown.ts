@@ -1,5 +1,6 @@
 import { StateEffect, StateField, type Range } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from '@codemirror/view';
+import { findBookBlocks, isLineInBook } from './lexicon';
 import { findNoteBlocks, isLineInNotes } from './notes';
 
 export const setRenderedModeEffect = StateEffect.define<boolean>();
@@ -18,6 +19,8 @@ const chapterDeco = Decoration.line({ class: 'cm-chapter-line' });
 const sectionDeco = Decoration.line({ class: 'cm-section-line' });
 const noteLineDeco = Decoration.line({ class: 'cm-note-line' });
 const noteTagDeco = Decoration.line({ class: 'cm-note-line cm-note-tag' });
+const bookLineDeco = Decoration.line({ class: 'cm-book-line' });
+const bookTagDeco = Decoration.line({ class: 'cm-book-line cm-book-tag' });
 const emphasisDeco = Decoration.mark({ class: 'cm-emphasis' });
 const emphasisMarkerDeco = Decoration.mark({ class: 'cm-emphasis-marker' });
 const hiddenMarkupDeco = Decoration.replace({});
@@ -43,6 +46,7 @@ function buildDecorations(view: EditorView): DecorationSet {
   const doc = view.state.doc;
   const fullText = doc.toString();
   const noteBlocks = findNoteBlocks(fullText);
+  const bookBlocks = findBookBlocks(fullText);
   const rendered = view.state.field(renderedModeField);
   const cursorLine = doc.lineAt(view.state.selection.main.head).number;
 
@@ -52,6 +56,13 @@ function buildDecorations(view: EditorView): DecorationSet {
     // In rendered mode the markup stays hidden except on the line being
     // edited, so the syntax reappears under the cursor.
     const hideMarkup = rendered && i !== cursorLine;
+
+    if (isLineInBook(bookBlocks, line.from)) {
+      const trimmed = text.trim();
+      const isTag = /^\[\/?Book\]$/i.test(trimmed);
+      ranges.push((isTag ? bookTagDeco : bookLineDeco).range(line.from));
+      continue;
+    }
 
     if (isLineInNotes(noteBlocks, line.from)) {
       const trimmed = text.trim();
@@ -151,6 +162,22 @@ export const markdownStyles = EditorView.baseTheme({
   },
   '.cm-note-label-widget': {
     color: 'var(--notes)',
+    fontStyle: 'italic',
+  },
+  '.cm-book-line': {
+    backgroundColor: 'var(--reminders-bg)',
+    borderLeft: '3px solid var(--reminders)',
+    paddingLeft: '0.5rem',
+    color: 'var(--reminders-text)',
+    fontFamily: 'var(--font-ui)',
+    fontSize: '0.9em',
+  },
+  '.cm-book-tag': {
+    fontSize: '0.75em',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    color: 'var(--reminders)',
     fontStyle: 'italic',
   },
   '.cm-emphasis': {
