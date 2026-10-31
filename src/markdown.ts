@@ -117,7 +117,7 @@ export const markdownHighlight = ViewPlugin.fromClass(
       const renderedChanged =
         update.state.field(renderedModeField) !== update.startState.field(renderedModeField);
       const cursorMoved = update.selectionSet && update.state.field(renderedModeField);
-      if (update.docChanged || update.viewportChanged || renderedChanged || cursorMoved) {
+      if (update.docChanged || renderedChanged || cursorMoved) {
         this.decorations = buildDecorations(update.view);
       }
     }

@@ -189,7 +189,7 @@ export const sunoPlugin = ViewPlugin.fromClass(
     update(update: ViewUpdate) {
       const modeChanged =
         update.state.field(lyricsModeField) !== update.startState.field(lyricsModeField);
-      if (update.docChanged || update.viewportChanged || modeChanged) {
+      if (update.docChanged || modeChanged) {
         this.decorations = buildDecorations(update.view);
       }
     }

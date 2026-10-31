@@ -65,30 +65,53 @@ function overlaps(view: EditorView, from: number, to: number): boolean {
 export const findHighlightPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
+    private matches: TextMatch[] = [];
+    private matchKey = '';
 
     constructor(view: EditorView) {
-      this.decorations = this.build(view);
+      this.syncMatches(view);
+      this.decorations = this.decorate(view);
     }
 
     update(update: ViewUpdate) {
       const refresh = update.transactions.some((tr) =>
         tr.effects.some((effect) => effect.is(refreshEffect)),
       );
+      // Scan when the query or the text changes. Scrolling only filters
+      // matches that were already found.
+      if (refresh || update.docChanged) this.syncMatches(update.view);
+      if (this.matches.length === 0) {
+        if (this.decorations !== Decoration.none) this.decorations = Decoration.none;
+        return;
+      }
       if (refresh || update.docChanged || update.viewportChanged || update.selectionSet) {
-        this.decorations = this.build(update.view);
+        this.decorations = this.decorate(update.view);
       }
     }
 
-    build(view: EditorView): DecorationSet {
-      if (!barOpen || !query.search) return Decoration.none;
+    syncMatches(view: EditorView) {
+      if (!barOpen || !query.search) {
+        this.matches = [];
+        this.matchKey = '';
+        return;
+      }
+      const text = view.state.doc.toString();
+      const nextKey = `${query.search}\0${query.caseSensitive}\0${query.wholeWord}\0${text}`;
+      if (nextKey === this.matchKey) return;
+      this.matchKey = nextKey;
+      this.matches = findMatches(text, query);
+    }
+
+    decorate(view: EditorView): DecorationSet {
+      if (this.matches.length === 0) return Decoration.none;
       const sel = view.state.selection.main;
       const ranges = [];
-      for (const match of findMatches(view.state.doc.toString(), query)) {
+      for (const match of this.matches) {
         if (!overlaps(view, match.from, match.to)) continue;
         const current = match.from === sel.from && match.to === sel.to;
         ranges.push((current ? currentMark : matchMark).range(match.from, match.to));
       }
-      return ranges.length ? Decoration.set(ranges) : Decoration.none;
+      return ranges.length ? Decoration.set(ranges, true) : Decoration.none;
     }
   },
   { decorations: (value) => value.decorations },

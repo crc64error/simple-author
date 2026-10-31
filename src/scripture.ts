@@ -48,20 +48,15 @@ function buildDecorations(view: EditorView): DecorationSet {
 
   const decorations: { from: number; to: number }[] = [];
   const doc = view.state.doc;
-  for (const { from, to } of view.visibleRanges) {
-    let pos = from;
-    while (pos <= to) {
-      const line = doc.lineAt(pos);
-      SCRIPTURE_PATTERN.lastIndex = 0;
-      let match: RegExpExecArray | null;
-      while ((match = SCRIPTURE_PATTERN.exec(line.text)) !== null) {
-        decorations.push({
-          from: line.from + match.index,
-          to: line.from + match.index + match[0].length,
-        });
-      }
-      if (line.number >= doc.lines) break;
-      pos = line.to + 1;
+  for (let n = 1; n <= doc.lines; n++) {
+    const line = doc.line(n);
+    SCRIPTURE_PATTERN.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = SCRIPTURE_PATTERN.exec(line.text)) !== null) {
+      decorations.push({
+        from: line.from + match.index,
+        to: line.from + match.index + match[0].length,
+      });
     }
   }
   return Decoration.set(decorations.map((d) => scriptureMark.range(d.from, d.to)));
@@ -78,7 +73,7 @@ export const scripturePlugin = ViewPlugin.fromClass(
     update(update: ViewUpdate) {
       const modeChanged =
         update.state.field(scriptureModeField) !== update.startState.field(scriptureModeField);
-      if (update.docChanged || update.viewportChanged || modeChanged) {
+      if (update.docChanged || modeChanged) {
         this.decorations = buildDecorations(update.view);
       }
     }

@@ -96,7 +96,6 @@ export const invisiblesPlugin = ViewPlugin.fromClass(
     update(update: ViewUpdate) {
       if (
         update.docChanged ||
-        update.viewportChanged ||
         update.state.field(showInvisiblesField) !== update.startState.field(showInvisiblesField)
       ) {
         this.decorations = buildInvisibles(update.view);
