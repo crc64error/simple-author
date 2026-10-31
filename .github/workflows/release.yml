@@ -42,14 +42,28 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # v1.1.0 is the beta. Older tags stay drafts until someone publishes them.
+      - name: Release notes
+        id: notes
+        run: |
+          {
+            echo 'body<<END'
+            if [ "${{ github.ref_name }}" = "v1.1.0" ]; then
+              cat .github/v1.1.0-notes.md
+            else
+              echo 'Download the installer for your platform below.'
+            fi
+            echo 'END'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and attach to release
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'Simple Author ${{ github.ref_name }}'
-          releaseBody: 'Download the installer for your platform below.'
-          releaseDraft: true
-          prerelease: false
+          releaseName: ${{ github.ref_name == 'v1.1.0' && 'Simple Author v1.1.0 (beta)' || format('Simple Author {0}', github.ref_name) }}
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: ${{ github.ref_name != 'v1.1.0' }}
+          prerelease: ${{ github.ref_name == 'v1.1.0' }}
           args: ${{ matrix.args }}

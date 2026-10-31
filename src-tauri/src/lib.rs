@@ -8,7 +8,7 @@ fn build_app_menu(app: &tauri::App) -> tauri::Result<()> {
 
     let about = AboutMetadata {
         name: Some("Simple Author".into()),
-        version: Some("1.0.0".into()),
+        version: Some("1.1.0".into()),
         copyright: Some("Copyright © 2026 Carey Scott Turner".into()),
         ..Default::default()
     };
