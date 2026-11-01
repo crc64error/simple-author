@@ -53,6 +53,7 @@ export const analysisEffect = StateEffect.define<AnalysisSnapshot>();
 let snapshot: AnalysisSnapshot = { generation: 0, chapters: [] };
 let getKey: () => string = () => 'simple-writer-draft';
 let onProgress: ((progress: AnalysisProgress | null) => void) | null = null;
+let onReady: ((snapshot: AnalysisSnapshot) => void) | null = null;
 let generation = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let forceSpelling = false;
@@ -68,6 +69,10 @@ export function setAnalysisDocumentKey(fn: () => string): void {
 
 export function setAnalysisProgress(fn: (progress: AnalysisProgress | null) => void): void {
   onProgress = fn;
+}
+
+export function setAnalysisListener(fn: (snapshot: AnalysisSnapshot) => void): void {
+  onReady = fn;
 }
 
 export function invalidateSpellingReuse(): void {
@@ -414,6 +419,7 @@ async function runAnalysis(view: EditorView, token: number): Promise<void> {
 
   snapshot = { generation: token, chapters: visible };
   setLatestGrammarIssues(absoluteGrammar);
+  onReady?.(snapshot);
   report(null);
   view.dispatch({
     effects: analysisEffect.of(snapshot),
