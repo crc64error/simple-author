@@ -419,6 +419,26 @@ function advice(word: string, sentenceStart: boolean, lex = emptyLexicon()) {
   assert.equal(lock.includes('name = "siphasher"\nversion = "1.0.3"'), true);
   const npmLock = fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8');
   assert.equal(npmLock.includes('"version": "1.0.3"'), false);
+
+  const crlf = fs.mkdtempSync(path.join(os.tmpdir(), 'stamp-crlf-'));
+  fs.mkdirSync(path.join(crlf, 'src-tauri'), { recursive: true });
+  const asCrlf = (text: string) => text.replace(/\n/g, '\r\n');
+  fs.writeFileSync(path.join(crlf, 'package.json'), asCrlf('{\n  "name": "simple-author",\n  "version": "1.0.3"\n}\n'));
+  fs.writeFileSync(
+    path.join(crlf, 'package-lock.json'),
+    asCrlf('{\n  "name": "simple-author",\n  "version": "1.0.3",\n  "packages": {\n    "": {\n      "name": "simple-author",\n      "version": "1.0.3"\n    }\n  }\n}\n'),
+  );
+  fs.writeFileSync(path.join(crlf, 'src-tauri/tauri.conf.json'), asCrlf('{\n  "version": "1.0.3"\n}\n'));
+  fs.writeFileSync(path.join(crlf, 'src-tauri/Cargo.toml'), asCrlf('[package]\nname = "simple-author"\nversion = "1.0.3"\n'));
+  fs.writeFileSync(
+    path.join(crlf, 'src-tauri/Cargo.lock'),
+    asCrlf('[[package]]\nname = "simple-author"\nversion = "1.0.3"\n\n[[package]]\nname = "siphasher"\nversion = "1.0.3"\n'),
+  );
+  assert.equal(stampReleaseVersion('v1.1.1', crlf), '1.1.1');
+  const crlfLock = fs.readFileSync(path.join(crlf, 'package-lock.json'), 'utf8');
+  assert.equal(crlfLock.includes('"version": "1.1.1"'), true);
+  assert.equal(crlfLock.includes('\r\n'), true);
+  assert.equal(fs.readFileSync(path.join(crlf, 'src-tauri/Cargo.lock'), 'utf8').includes('name = "siphasher"\r\nversion = "1.0.3"'), true);
 }
 
 console.log('editing checks passed');

@@ -19,6 +19,7 @@ function replaceOnce(path, pattern, replacement) {
   if (!pattern.test(text)) {
     throw new Error(`No version field matched in ${path}`);
   }
+  pattern.lastIndex = 0;
   writeFileSync(path, text.replace(pattern, replacement));
 }
 
@@ -33,12 +34,12 @@ export function stampReleaseVersion(tag, root = process.cwd()) {
 
   replaceOnce(
     join(root, 'package-lock.json'),
-    /("name": "simple-author",\n  "version": ")[^"]+"/,
+    /("name": "simple-author",\r?\n  "version": ")[^"]+"/,
     `$1${version}"`,
   );
   replaceOnce(
     join(root, 'package-lock.json'),
-    /("": \{\n {6}"name": "simple-author",\n {6}"version": ")[^"]+"/,
+    /("": \{\r?\n {6}"name": "simple-author",\r?\n {6}"version": ")[^"]+"/,
     `$1${version}"`,
   );
 
@@ -56,7 +57,7 @@ export function stampReleaseVersion(tag, root = process.cwd()) {
 
   replaceOnce(
     join(root, 'src-tauri/Cargo.lock'),
-    /(name = "simple-author"\n)version = "[^"]+"/,
+    /(name = "simple-author"\r?\n)version = "[^"]+"/,
     `$1version = "${version}"`,
   );
 
