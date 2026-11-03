@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import NSpell from 'nspell';
 import { EditorState } from '@codemirror/state';
 import { history, undo, undoDepth } from '@codemirror/commands';
@@ -11,6 +13,7 @@ import { toEpub, toPlainText, toPublishMarkdown } from '../src/export.ts';
 import { findGrammarIssues, type GrammarSettings } from '../src/grammar.ts';
 import { findMathSpans, texToUnicode } from '../src/math.ts';
 import { countWords } from '../src/wordcount.ts';
+import { stampReleaseVersion, versionFromTag } from '../scripts/stamp-release-version.mjs';
 import JSZip from 'jszip';
 import { collectIssues } from '../src/issues.ts';
 import { canonicalName, lexiconChanges, readLexicon } from '../src/lexicon.ts';
@@ -353,6 +356,8 @@ function advice(word: string, sentenceStart: boolean, lex = emptyLexicon()) {
   assert.equal(xhtml.includes('class="equation"'), true);
   assert.equal(opf.includes('properties="mathml"'), true);
   assert.equal(xhtml.includes('$'), false);
+}
+
 // --- issue list follows the manuscript and drops duplicates ---
 {
   const doc = 'She saw the the lantern. Elara smiled.';
@@ -384,6 +389,36 @@ function advice(word: string, sentenceStart: boolean, lex = emptyLexicon()) {
     },
   ]);
   assert.equal(skipped.length, 0);
+}
+
+// --- release tags ---
+{
+  assert.throws(() => versionFromTag('v.1.1.1'), /v1\.2\.3/);
+  assert.throws(() => versionFromTag('v1.1'), /v1\.2\.3/);
+  assert.equal(versionFromTag('v1.1.1'), '1.1.1');
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stamp-'));
+  fs.mkdirSync(path.join(root, 'src-tauri'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'package.json'), '{\n  "name": "simple-author",\n  "version": "1.0.3"\n}\n');
+  fs.writeFileSync(
+    path.join(root, 'package-lock.json'),
+    '{\n  "name": "simple-author",\n  "version": "1.0.3",\n  "packages": {\n    "": {\n      "name": "simple-author",\n      "version": "1.0.3"\n    }\n  }\n}\n',
+  );
+  fs.writeFileSync(path.join(root, 'src-tauri/tauri.conf.json'), '{\n  "version": "1.0.3"\n}\n');
+  fs.writeFileSync(path.join(root, 'src-tauri/Cargo.toml'), '[package]\nname = "simple-author"\nversion = "1.0.3"\n');
+  fs.writeFileSync(
+    path.join(root, 'src-tauri/Cargo.lock'),
+    '[[package]]\nname = "simple-author"\nversion = "1.0.3"\n\n[[package]]\nname = "siphasher"\nversion = "1.0.3"\n',
+  );
+  assert.equal(stampReleaseVersion('v1.1.1', root), '1.1.1');
+  assert.equal(fs.readFileSync(path.join(root, 'package.json'), 'utf8').includes('"version": "1.1.1"'), true);
+  assert.equal(fs.readFileSync(path.join(root, 'src-tauri/tauri.conf.json'), 'utf8').includes('"version": "1.1.1"'), true);
+  assert.equal(fs.readFileSync(path.join(root, 'src-tauri/Cargo.toml'), 'utf8').includes('version = "1.1.1"'), true);
+  const lock = fs.readFileSync(path.join(root, 'src-tauri/Cargo.lock'), 'utf8');
+  assert.equal(lock.includes('name = "simple-author"\nversion = "1.1.1"'), true);
+  assert.equal(lock.includes('name = "siphasher"\nversion = "1.0.3"'), true);
+  const npmLock = fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8');
+  assert.equal(npmLock.includes('"version": "1.0.3"'), false);
 }
 
 console.log('editing checks passed');
