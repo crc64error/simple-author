@@ -8,6 +8,7 @@ import { matchCachedChapters } from '../src/analysis-cache.ts';
 import { chapterSlices, hashText, paragraphSlices } from '../src/analysis.ts';
 import { findMatches, replaceAllChanges } from '../src/findbar.ts';
 import { findGrammarIssues, type GrammarSettings } from '../src/grammar.ts';
+import { collectIssues } from '../src/issues.ts';
 import { canonicalName, lexiconChanges, readLexicon } from '../src/lexicon.ts';
 import { classifyWord, type SpellDict } from '../src/spellcheck.ts';
 import { isSentenceStart, lineEndsSentence } from '../src/prose.ts';
@@ -295,6 +296,39 @@ function advice(word: string, sentenceStart: boolean, lex = emptyLexicon()) {
   );
   assert.equal(aligned.filter((paragraph) => paragraph === null).length, 1);
   assert.ok(aligned.filter((paragraph) => paragraph !== null).length >= 2);
+}
+
+// --- issue list follows the manuscript and drops duplicates ---
+{
+  const doc = 'She saw the the lantern. Elara smiled.';
+  const repeated = doc.indexOf('the the');
+  const name = doc.indexOf('Elara');
+  const items = collectIssues(doc, [
+    {
+      from: 0,
+      grammar: [
+        { from: repeated, to: repeated + 'the the'.length, rule: 'repeat', message: '“the” is repeated.' },
+        { from: repeated, to: repeated + 'the the'.length, rule: 'repeat', message: '“the” is repeated.' },
+      ],
+      spelling: [{ from: name, to: name + 'Elara'.length }],
+    },
+  ]);
+  assert.deepEqual(
+    items.map((item) => [item.kind, item.excerpt, item.from]),
+    [
+      ['grammar', 'the the', repeated],
+      ['spelling', 'Elara', name],
+    ],
+  );
+  assert.equal(items[0].label, '“the” is repeated.');
+  const skipped = collectIssues(doc, [
+    {
+      from: 0,
+      grammar: [{ from: 0, to: 0, rule: 'repeat', message: 'empty' }],
+      spelling: [{ from: -1, to: 4 }],
+    },
+  ]);
+  assert.equal(skipped.length, 0);
 }
 
 console.log('editing checks passed');

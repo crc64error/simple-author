@@ -13,7 +13,8 @@ import { createTabs, type TabsApi } from './tabs';
 import { createPublishingModal } from './publishing-guide';
 import { createOutline } from './outline';
 import { createReminders } from './reminders';
-import { setAnalysisDocumentKey, setAnalysisProgress } from './analysis';
+import { analysisSnapshot, setAnalysisDocumentKey, setAnalysisListener, setAnalysisProgress } from './analysis';
+import { createIssuesPanel } from './issues';
 import { initSpellcheck } from './spellcheck';
 import { setupFindBar } from './findbar';
 import { mountGrammarMenu } from './grammar';
@@ -63,6 +64,7 @@ function updateUI(snapshot: EditorSnapshot): void {
   cursorContextEl.textContent = parts.length > 0 ? parts.join(' · ') : '';
 
   outline.update(doc, cursorPos);
+  issuesPanel?.syncCursor(cursorPos);
   tabsApi?.refreshTitle(doc);
 }
 
@@ -80,6 +82,8 @@ const notesToggle = document.getElementById('btn-toggle-notes') as HTMLButtonEle
 const marksToggle = document.getElementById('btn-toggle-marks') as HTMLButtonElement;
 
 let scrollToPosition: (pos: number) => void = () => {};
+let scrollToRange: (from: number, to: number) => void = () => {};
+let issuesPanel: ReturnType<typeof createIssuesPanel> | null = null;
 
 const outline = createOutline(outlineSidebar, (pos) => {
   scrollToPosition(pos);
@@ -137,6 +141,16 @@ setAnalysisProgress((progress) => {
 });
 
 scrollToPosition = (pos) => editor.scrollTo(pos);
+scrollToRange = (from, to) => editor.scrollToRange(from, to);
+issuesPanel = createIssuesPanel(outlineSidebar, (from, to) => scrollToRange(from, to));
+setAnalysisListener((snapshot) => {
+  issuesPanel?.show(editor.getContent(), snapshot.chapters);
+  issuesPanel?.syncCursor(editor.view.state.selection.main.head);
+});
+// A check that finished before the panel existed still has its results.
+if (analysisSnapshot().chapters.length > 0) {
+  issuesPanel.show(editor.getContent(), analysisSnapshot().chapters);
+}
 editor.setShowNotes(showNotes);
 notesToggle.textContent = showNotes ? 'Hide Notes' : 'Show Notes';
 notesToggle.setAttribute('aria-pressed', String(showNotes));
