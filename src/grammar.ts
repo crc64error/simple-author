@@ -6,6 +6,7 @@ import { analysisEffect, analysisSnapshot, scheduleAnalysis } from './analysis';
 import { findBookBlocks, readLexicon, type Lexicon } from './lexicon';
 import { findNoteBlocks } from './notes';
 import { WORD_REGEX_SOURCE, gapEndsSentence } from './prose';
+import { findMathSpans } from './math';
 import { findStyleBlocks } from './suno';
 import { POS, hasPos, lookupPos, thesaurusReady } from './thesaurus';
 
@@ -184,6 +185,7 @@ function hiddenSpans(doc: string): Span[] {
     ...findNoteBlocks(doc).map((block) => ({ start: block.start, end: block.end })),
     ...findBookBlocks(doc).map((block) => ({ start: block.start, end: block.end })),
     ...findStyleBlocks(doc).map((block) => ({ start: block.start, end: block.end })),
+    ...findMathSpans(doc).map((span) => ({ start: span.from, end: span.to })),
   ];
   return spans.sort((a, b) => a.start - b.start);
 }

@@ -7,7 +7,11 @@ import { linePrefixEdit, wrapEdit } from '../src/editor.ts';
 import { matchCachedChapters } from '../src/analysis-cache.ts';
 import { chapterSlices, hashText, paragraphSlices } from '../src/analysis.ts';
 import { findMatches, replaceAllChanges } from '../src/findbar.ts';
+import { toEpub, toPlainText, toPublishMarkdown } from '../src/export.ts';
 import { findGrammarIssues, type GrammarSettings } from '../src/grammar.ts';
+import { findMathSpans, texToUnicode } from '../src/math.ts';
+import { countWords } from '../src/wordcount.ts';
+import JSZip from 'jszip';
 import { canonicalName, lexiconChanges, readLexicon } from '../src/lexicon.ts';
 import { classifyWord, type SpellDict } from '../src/spellcheck.ts';
 import { isSentenceStart, lineEndsSentence } from '../src/prose.ts';
@@ -295,6 +299,59 @@ function advice(word: string, sentenceStart: boolean, lex = emptyLexicon()) {
   );
   assert.equal(aligned.filter((paragraph) => paragraph === null).length, 1);
   assert.ok(aligned.filter((paragraph) => paragraph !== null).length >= 2);
+}
+
+// --- mathematical notation ---
+{
+  const tex = 'W(T) = W_{\\min} + (W_{\\text{rest}} - W_{\\min})\\, e^{-k(T - T_{\\text{cold}})}';
+  const printed = 'W(T) = Wₘᵢₙ + (Wᵣₑₛₜ − Wₘᵢₙ) e^(−k(T − T_cold))';
+  assert.equal(texToUnicode(tex), printed);
+  assert.equal(texToUnicode('\\frac{1}{2}'), '(1)/(2)');
+  assert.equal(texToUnicode('\\sqrt{x}'), '√(x)');
+  assert.equal(texToUnicode('\\alpha \\leq \\infty'), 'α ≤ ∞');
+
+  const display = `$$\n${tex}\n$$`;
+  const sentence = `The heat followed $${tex}$.`;
+  const prose = `She paid $20 and $3.50.\n\n${display}\n\n${sentence}\n\nShe saw the the lantern.`;
+
+  const spans = findMathSpans(prose);
+  assert.equal(spans.length, 2);
+  assert.equal(spans[0].display, true);
+  assert.equal(spans[1].display, false);
+  assert.equal(spans[1].tex, tex);
+  assert.equal(findMathSpans('She paid $20 and $3.50.').length, 0);
+  assert.equal(findMathSpans('A cost of \\$20 and an unclosed $$start.').length, 0);
+
+  const plain = toPlainText(prose);
+  assert.equal(plain.includes(printed), true);
+  assert.equal(plain.includes('_{'), false);
+  assert.equal(plain.includes('$20'), true);
+  assert.equal(toPublishMarkdown(prose).includes('$$'), true);
+  assert.equal(toPublishMarkdown(prose).includes('\\min'), true);
+
+  const repeat = findGrammarIssues('She saw the the lantern.', { enabled: true, rules: { repeat: true } });
+  assert.equal(repeat.some((issue) => issue.rule === 'repeat'), true);
+  const hidden = findGrammarIssues(`She saw the lantern.\n\n$$the the$$\n\nA quiet room.`, {
+    enabled: true,
+    rules: { repeat: true },
+  });
+  assert.equal(hidden.some((issue) => issue.rule === 'repeat'), false);
+
+  assert.equal(countWords(`The cabin held.\n\n$$${tex}$$`), 3);
+
+  const epub = await toEpub(`## Cold\n\n${display}\n`, 'Cold');
+  const zip = await JSZip.loadAsync(Buffer.from(await epub.arrayBuffer()));
+  const xhtmlName = Object.keys(zip.files).find((name) => name.endsWith('.xhtml') && name.includes('item'));
+  assert.ok(xhtmlName, 'chapter xhtml missing');
+  const xhtml = await zip.file(xhtmlName!)!.async('string');
+  const opf = await zip.file('OEBPS/content.opf')!.async('string');
+  assert.equal(xhtml.includes('<math'), true);
+  assert.equal(xhtml.includes('epub:switch'), true);
+  assert.equal(xhtml.includes('epub:default'), true);
+  assert.equal(xhtml.includes(printed), true);
+  assert.equal(xhtml.includes('class="equation"'), true);
+  assert.equal(opf.includes('properties="mathml"'), true);
+  assert.equal(xhtml.includes('$'), false);
 }
 
 console.log('editing checks passed');

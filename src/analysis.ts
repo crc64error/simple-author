@@ -20,6 +20,7 @@ import {
   type GrammarSettings,
 } from './grammar';
 import { findBookBlocks, isLineInBook, readLexicon, type Lexicon } from './lexicon';
+import { findMathSpans, rangeOverlapsMath } from './math';
 import { findNoteBlocks, isLineInNotes } from './notes';
 import { lineOpensSentence, wordsInLine } from './prose';
 import {
@@ -166,6 +167,7 @@ async function spellingIn(text: string, lex: Lexicon, token: number): Promise<Sp
   if (!spellReady()) return [];
   const noteBlocks = findNoteBlocks(text);
   const bookBlocks = findBookBlocks(text);
+  const mathSpans = findMathSpans(text);
   const marks: SpellMark[] = [];
   const lines = text.split('\n');
   let offset = 0;
@@ -179,6 +181,7 @@ async function spellingIn(text: string, lex: Lexicon, token: number): Promise<Sp
       !/^#{1,3}\s/.test(line)
     ) {
       for (const span of wordsInLine(line, lineOpensSentence(text, offset))) {
+        if (rangeOverlapsMath(mathSpans, offset + span.from, offset + span.to)) continue;
         const advice = classifyWord(span.word, span.sentenceStart, lex, dict);
         if (advice.kind !== 'ok') marks.push({ from: offset + span.from, to: offset + span.to });
         words++;
