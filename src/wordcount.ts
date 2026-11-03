@@ -16,6 +16,7 @@ export interface OutlineSection {
 }
 
 import { stripBookBlocks } from './lexicon';
+import { stripMathSource } from './math';
 import { stripNotes } from './notes';
 
 function stripPrivate(text: string): string {
@@ -34,7 +35,7 @@ const SECTION_PATTERN = /^# (?!#)/;
 const CHAPTER_PATTERN = /^## (?!#)/;
 
 export function stripMarkup(text: string): string {
-  return text
+  return stripMathSource(text)
     .replace(/^#{1,3}\s+/gm, '')
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/_([^_]+)_/g, '$1')

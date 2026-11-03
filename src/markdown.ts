@@ -1,6 +1,7 @@
 import { StateEffect, StateField, type Range } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from '@codemirror/view';
 import { findBookBlocks, isLineInBook } from './lexicon';
+import { findMathSpans, texToMathML, texToUnicode } from './math';
 import { findNoteBlocks, isLineInNotes } from './notes';
 
 export const setRenderedModeEffect = StateEffect.define<boolean>();
@@ -24,6 +25,33 @@ const bookTagDeco = Decoration.line({ class: 'cm-book-line cm-book-tag' });
 const emphasisDeco = Decoration.mark({ class: 'cm-emphasis' });
 const emphasisMarkerDeco = Decoration.mark({ class: 'cm-emphasis-marker' });
 const hiddenMarkupDeco = Decoration.replace({});
+const mathMark = Decoration.mark({ class: 'cm-math' });
+
+class MathWidget extends WidgetType {
+  constructor(
+    readonly display: boolean,
+    readonly tex: string,
+  ) {
+    super();
+  }
+
+  eq(other: WidgetType): boolean {
+    return other instanceof MathWidget && other.display === this.display && other.tex === this.tex;
+  }
+
+  toDOM(): HTMLElement {
+    const el = document.createElement(this.display ? 'div' : 'span');
+    el.className = this.display ? 'cm-math-display' : 'cm-math-inline';
+    const mathml = texToMathML(this.tex, this.display);
+    if (mathml) el.innerHTML = mathml;
+    else el.textContent = texToUnicode(this.tex);
+    return el;
+  }
+
+  ignoreEvent(): boolean {
+    return false;
+  }
+}
 
 class NoteLabelWidget extends WidgetType {
   toDOM(): HTMLElement {
@@ -47,6 +75,7 @@ function buildDecorations(view: EditorView): DecorationSet {
   const fullText = doc.toString();
   const noteBlocks = findNoteBlocks(fullText);
   const bookBlocks = findBookBlocks(fullText);
+  const mathSpans = findMathSpans(fullText);
   const rendered = view.state.field(renderedModeField);
   const cursorLine = doc.lineAt(view.state.selection.main.head).number;
 
@@ -87,18 +116,44 @@ function buildDecorations(view: EditorView): DecorationSet {
       continue;
     }
 
-    const italicPattern = /\*([^*\n]+)\*|_([^_\n]+)_/g;
-    let match: RegExpExecArray | null;
-    while ((match = italicPattern.exec(text)) !== null) {
-      const fullStart = line.from + match.index;
-      const fullEnd = fullStart + match[0].length;
-      const contentStart = fullStart + 1;
-      const contentEnd = fullEnd - 1;
-      const markerDeco = hideMarkup ? hiddenMarkupDeco : emphasisMarkerDeco;
+    const covered: Array<[number, number]> = [];
+    for (const span of mathSpans) {
+      const from = Math.max(span.from, line.from);
+      const to = Math.min(span.to, line.to);
+      if (from >= to) continue;
+      const wholeLine = span.from >= line.from && span.to <= line.to && !span.tex.includes('\n');
+      if (hideMarkup && wholeLine) {
+        ranges.push(Decoration.replace({ widget: new MathWidget(span.display, span.tex) }).range(from, to));
+      } else {
+        ranges.push(mathMark.range(from, to));
+      }
+      covered.push([from - line.from, to - line.from]);
+    }
 
-      ranges.push(markerDeco.range(fullStart, fullStart + 1));
-      ranges.push(emphasisDeco.range(contentStart, contentEnd));
-      ranges.push(markerDeco.range(fullEnd - 1, fullEnd));
+    const gaps: Array<[number, number]> = [];
+    let cursor = 0;
+    for (const [from, to] of covered.sort((a, b) => a[0] - b[0])) {
+      if (from > cursor) gaps.push([cursor, from]);
+      cursor = Math.max(cursor, to);
+    }
+    if (cursor < text.length) gaps.push([cursor, text.length]);
+
+    const italicPattern = /\*([^*\n]+)\*|_([^_\n]+)_/g;
+    for (const [gapFrom, gapTo] of gaps) {
+      italicPattern.lastIndex = 0;
+      const slice = text.slice(gapFrom, gapTo);
+      let match: RegExpExecArray | null;
+      while ((match = italicPattern.exec(slice)) !== null) {
+        const fullStart = line.from + gapFrom + match.index;
+        const fullEnd = fullStart + match[0].length;
+        const contentStart = fullStart + 1;
+        const contentEnd = fullEnd - 1;
+        const markerDeco = hideMarkup ? hiddenMarkupDeco : emphasisMarkerDeco;
+        if (contentStart >= contentEnd) continue;
+        ranges.push(markerDeco.range(fullStart, fullStart + 1));
+        ranges.push(emphasisDeco.range(contentStart, contentEnd));
+        ranges.push(markerDeco.range(fullEnd - 1, fullEnd));
+      }
     }
   }
 
@@ -188,6 +243,17 @@ export const markdownStyles = EditorView.baseTheme({
     color: 'var(--text-muted)',
     fontStyle: 'normal',
     opacity: '0.45',
+  },
+  '.cm-math': {
+    color: 'var(--section)',
+  },
+  '.cm-math-display': {
+    display: 'block',
+    textAlign: 'center',
+    margin: '0.75em 0',
+  },
+  '.cm-math-inline': {
+    padding: '0 0.15em',
   },
   '.cm-spell-error': {
     textDecoration: 'underline wavy',

@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { stripBookBlocks } from './lexicon';
+import { findMathSpans, texToMathML, texToUnicode, type MathSpan } from './math';
 import { stripNotes } from './notes';
 import { stripStyleBlocks } from './suno';
 
@@ -26,6 +27,27 @@ function inlineMarkup(text: string): string {
     .replace(/_([^_]+)_/g, '<em>$1</em>');
 }
 
+function epubMath(span: MathSpan): string {
+  const plain = escapeHtml(texToUnicode(span.tex));
+  const mathml =
+    texToMathML(span.tex, span.display) ??
+    `<math xmlns="http://www.w3.org/1998/Math/MathML"><mtext>${plain}</mtext></math>`;
+  return `<epub:switch><epub:case required-namespace="http://www.w3.org/1998/Math/MathML">${mathml}</epub:case><epub:default>${plain}</epub:default></epub:switch>`;
+}
+
+function inlineWithMath(text: string): string {
+  const spans = findMathSpans(text);
+  if (spans.length === 0) return inlineMarkup(text);
+  let html = '';
+  let cursor = 0;
+  for (const span of spans) {
+    html += inlineMarkup(text.slice(cursor, span.from));
+    html += epubMath(span);
+    cursor = span.to;
+  }
+  return html + inlineMarkup(text.slice(cursor));
+}
+
 function stripPrivate(doc: string): string {
   return stripBookBlocks(stripNotes(stripStyleBlocks(doc)));
 }
@@ -34,26 +56,45 @@ export function toPublishMarkdown(doc: string): string {
   return stripPrivate(doc).trimEnd() + '\n';
 }
 
-export function toPlainText(doc: string): string {
-  return stripPrivate(doc)
+function unwrapPlain(text: string): string {
+  return text
     .replace(/^#{1,3}\s+/gm, '')
     .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/_([^_]+)_/g, '$1')
-    .replace(/\n{3,}/g, '\n\n')
-    .trimEnd() + '\n';
+    .replace(/_([^_]+)_/g, '$1');
+}
+
+export function toPlainText(doc: string): string {
+  const clean = stripPrivate(doc);
+  const spans = findMathSpans(clean);
+  let out = '';
+  let cursor = 0;
+  for (const span of spans) {
+    out += unwrapPlain(clean.slice(cursor, span.from));
+    out += texToUnicode(span.tex);
+    cursor = span.to;
+  }
+  out += unwrapPlain(clean.slice(cursor));
+  return out.replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
 }
 
 function proseToHtml(text: string): string {
   const paragraphs = text.split(/\n{2,}/).filter((p) => p.trim());
   return paragraphs
-    .map((p) => `<p>${inlineMarkup(p.replace(/\n/g, ' ').trim())}</p>`)
+    .map((paragraph) => {
+      const flat = paragraph.replace(/\n/g, ' ').trim();
+      const spans = findMathSpans(flat);
+      const onlyDisplay =
+        spans.length === 1 && spans[0].display && spans[0].from === 0 && spans[0].to === flat.length;
+      if (onlyDisplay) return `<p class="equation">${epubMath(spans[0])}</p>`;
+      return `<p>${inlineWithMath(flat)}</p>`;
+    })
     .join('\n    ');
 }
 
 function chapterXhtml(title: string, body: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en">
 <head>
   <title>${escapeHtml(title)}</title>
   <link rel="stylesheet" type="text/css" href="stylesheet.css"/>
@@ -105,7 +146,7 @@ function parsePublishStructure(clean: string): PublishItem[] {
 function sectionXhtml(title: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en">
 <head>
   <title>${escapeHtml(title)}</title>
   <link rel="stylesheet" type="text/css" href="stylesheet.css"/>
@@ -139,7 +180,8 @@ export async function toEpub(doc: string, title = "Manuscript"): Promise<Blob> {
 h1 { font-size: 1.6em; margin-top: 2em; }
 h2 { font-size: 1.3em; margin-top: 1.5em; }
 p { margin: 0 0 1em 0; text-indent: 1.5em; }
-p:first-of-type { text-indent: 0; }
+p:first-of-type, p.equation { text-indent: 0; }
+p.equation { text-align: center; margin: 1.2em 0; }
 em { font-style: italic; }`,
   );
 
@@ -149,17 +191,22 @@ em { font-style: italic; }`,
   let itemIndex = 1;
   let navIndex = 1;
 
-  const addItem = (id: string, href: string, mediaType: string, spine = true): void => {
-    manifestItems.push(`<item id="${id}" href="${href}" media-type="${mediaType}"/>`);
+  const addItem = (id: string, href: string, mediaType: string, spine = true, properties = ''): void => {
+    const extra = properties ? ` properties="${properties}"` : '';
+    manifestItems.push(`<item id="${id}" href="${href}" media-type="${mediaType}"${extra}/>`);
     if (spine) spineItems.push(`<itemref idref="${id}"/>`);
   };
 
   addItem('css', 'stylesheet.css', 'text/css', false);
 
+  const writeChapter = (id: string, href: string, xhtml: string): void => {
+    addItem(id, href, 'application/xhtml+xml', true, xhtml.includes('<math') ? 'mathml' : '');
+    oebps.file(href, xhtml);
+  };
+
   if (structure.length === 0) {
     const href = 'body.xhtml';
-    addItem('body', href, 'application/xhtml+xml');
-    oebps.file(href, chapterXhtml(title, clean));
+    writeChapter('body', href, chapterXhtml(title, clean));
     navPoints.push(
       `<navPoint id="nav${navIndex}" playOrder="${navIndex}"><navLabel><text>${escapeHtml(title)}</text></navLabel><content src="${href}"/></navPoint>`,
     );
@@ -169,11 +216,9 @@ em { font-style: italic; }`,
       const id = `item-${itemIndex}`;
 
       if (item.type === 'section') {
-        addItem(id, href, 'application/xhtml+xml');
-        oebps.file(href, sectionXhtml(item.title));
+        writeChapter(id, href, sectionXhtml(item.title));
       } else {
-        addItem(id, href, 'application/xhtml+xml');
-        oebps.file(href, chapterXhtml(item.title, item.body));
+        writeChapter(id, href, chapterXhtml(item.title, item.body));
       }
 
       navPoints.push(
