@@ -209,9 +209,96 @@ body {
 }
 
 .outline-body {
-  flex: 1;
+  flex: 1.15;
+  min-height: 0;
   overflow-y: auto;
   padding: 0.5rem 0;
+}
+
+.issues-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+
+.issues-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem 0.35rem;
+  flex-shrink: 0;
+}
+
+.issues-count {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.issues-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 0.4rem;
+}
+
+.issues-empty {
+  padding: 0.35rem 1rem 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.issues-list {
+  list-style: none;
+}
+
+.issue-item {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 1rem;
+  font-family: var(--font-ui);
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.issue-item:hover,
+.issue-item.active {
+  background: var(--accent-soft);
+}
+
+.issue-excerpt {
+  display: block;
+  font-size: 0.84rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.issue-label {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.issue-item.spelling .issue-excerpt {
+  text-decoration: underline wavy;
+  text-decoration-color: var(--spell-error);
+  text-underline-offset: 2px;
+}
+
+.issue-item.grammar .issue-excerpt {
+  border-bottom: 1px dotted var(--grammar-hint);
 }
 
 .outline-empty {

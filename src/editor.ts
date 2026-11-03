@@ -120,6 +120,7 @@ export interface WriterEditor {
   wrapSelection: (before: string, after: string) => void;
   insertLinePrefix: (prefix: string) => void;
   scrollTo: (pos: number) => void;
+  scrollToRange: (from: number, to: number) => void;
   wrapInNotes: () => void;
   insertBlock: (text: string, placement: 'top' | 'cursor' | 'end') => void;
   setShowNotes: (show: boolean) => void;
@@ -223,6 +224,16 @@ export function createEditor(
       view.dispatch({
         selection: { anchor: pos },
         effects: EditorView.scrollIntoView(pos, { y: 'start', yMargin: 80 }),
+      });
+      view.focus();
+    },
+    scrollToRange: (from: number, to: number) => {
+      const max = view.state.doc.length;
+      const start = Math.max(0, Math.min(from, max));
+      const end = Math.max(start, Math.min(to, max));
+      view.dispatch({
+        selection: { anchor: start, head: end },
+        effects: EditorView.scrollIntoView(start, { y: 'center' }),
       });
       view.focus();
     },

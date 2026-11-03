@@ -12,6 +12,7 @@ import { findGrammarIssues, type GrammarSettings } from '../src/grammar.ts';
 import { findMathSpans, texToUnicode } from '../src/math.ts';
 import { countWords } from '../src/wordcount.ts';
 import JSZip from 'jszip';
+import { collectIssues } from '../src/issues.ts';
 import { canonicalName, lexiconChanges, readLexicon } from '../src/lexicon.ts';
 import { classifyWord, type SpellDict } from '../src/spellcheck.ts';
 import { isSentenceStart, lineEndsSentence } from '../src/prose.ts';
@@ -352,6 +353,37 @@ function advice(word: string, sentenceStart: boolean, lex = emptyLexicon()) {
   assert.equal(xhtml.includes('class="equation"'), true);
   assert.equal(opf.includes('properties="mathml"'), true);
   assert.equal(xhtml.includes('$'), false);
+// --- issue list follows the manuscript and drops duplicates ---
+{
+  const doc = 'She saw the the lantern. Elara smiled.';
+  const repeated = doc.indexOf('the the');
+  const name = doc.indexOf('Elara');
+  const items = collectIssues(doc, [
+    {
+      from: 0,
+      grammar: [
+        { from: repeated, to: repeated + 'the the'.length, rule: 'repeat', message: '“the” is repeated.' },
+        { from: repeated, to: repeated + 'the the'.length, rule: 'repeat', message: '“the” is repeated.' },
+      ],
+      spelling: [{ from: name, to: name + 'Elara'.length }],
+    },
+  ]);
+  assert.deepEqual(
+    items.map((item) => [item.kind, item.excerpt, item.from]),
+    [
+      ['grammar', 'the the', repeated],
+      ['spelling', 'Elara', name],
+    ],
+  );
+  assert.equal(items[0].label, '“the” is repeated.');
+  const skipped = collectIssues(doc, [
+    {
+      from: 0,
+      grammar: [{ from: 0, to: 0, rule: 'repeat', message: 'empty' }],
+      spelling: [{ from: -1, to: 4 }],
+    },
+  ]);
+  assert.equal(skipped.length, 0);
 }
 
 console.log('editing checks passed');
