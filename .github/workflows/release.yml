@@ -1,9 +1,16 @@
 name: Release
 
+# Tags must look like v1.2.3. v.1.1.1 (a dot after the v) does not match,
+# so a mistyped tag cannot open another release.
+# Leave the release alone until this workflow finishes. Creating or
+# publishing one by hand on the same tag makes a second, empty release.
 on:
   push:
-    tags: ['v*']
-  workflow_dispatch:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   build:
@@ -28,6 +35,12 @@ jobs:
         with:
           node-version: lts/*
 
+      - name: Require a vMAJOR.MINOR.PATCH tag
+        run: node scripts/stamp-release-version.mjs "${GITHUB_REF_NAME}" --check
+
+      - name: Stamp the app version from the tag
+        run: node scripts/stamp-release-version.mjs "${GITHUB_REF_NAME}"
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -48,8 +61,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'Simple Author ${{ github.ref_name }}'
-          releaseBody: 'Download the installer for your platform below.'
+          releaseName: 'Simple Author ${{ github.ref_name }} (beta)'
+          releaseBody: 'Beta ${{ github.ref_name }} of Simple Author. Download the installer for your platform below.'
           releaseDraft: true
-          prerelease: false
+          prerelease: true
           args: ${{ matrix.args }}
